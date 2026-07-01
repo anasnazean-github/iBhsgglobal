@@ -122,7 +122,12 @@ export function StoresVisibilityModule({ profile }: StoresVisibilityModuleProps)
   const fetchFreshData = async (sheetName: string, forceSync = false) => {
     try {
       if (forceSync) {
-        await fetch(`https://ib.hsgglobalpteltd.workers.dev/api/admin/cache?sheet=${sheetName}`, { method: "POST" });
+        const res = await fetch(`https://ib.hsgglobalpteltd.workers.dev/api/admin/cache?sheet=${sheetName}&skipCache=true`);
+        if (!res.ok) throw new Error(`Failed to fetch ${sheetName}`);
+        const json = await res.json();
+        const items = Array.isArray(json) ? json : (json.value || []);
+        localStorage.setItem(`${sheetName}_data`, JSON.stringify(items));
+        return items;
       }
       return await fetchSheet(sheetName);
     } catch (e) {
@@ -149,12 +154,12 @@ export function StoresVisibilityModule({ profile }: StoresVisibilityModuleProps)
 
     setFetching(true);
     Promise.all([
-      pLogsCached ? Promise.resolve(JSON.parse(pLogsCached)) : fetchSheet("Merch_Visit_Product_Audit_Logs"),
-      sLogsCached ? Promise.resolve(JSON.parse(sLogsCached)) : fetchSheet("Merch_Visit_Shelf_Audit_Logs"),
-      storesCached ? Promise.resolve(JSON.parse(storesCached)) : fetchSheet("Store_Retailer_DB"),
-      productsCached ? Promise.resolve(JSON.parse(productsCached)) : fetchSheet("products_DB"),
-      retailersCached ? Promise.resolve(JSON.parse(retailersCached)) : fetchSheet("retailers_DB"),
-      brandsCached ? Promise.resolve(JSON.parse(brandsCached)) : fetchSheet("brands_DB")
+      fetchSheet("Merch_Visit_Product_Audit_Logs"),
+      fetchSheet("Merch_Visit_Shelf_Audit_Logs"),
+      fetchSheet("Store_Retailer_DB"),
+      fetchSheet("products_DB"),
+      fetchSheet("retailers_DB"),
+      fetchSheet("brands_DB")
     ]).then(([p, s, st, pr, rt, br]) => {
       setProductLogs(p);
       setShelfLogs(s);
@@ -186,12 +191,12 @@ export function StoresVisibilityModule({ profile }: StoresVisibilityModuleProps)
       setFetching(true);
       try {
         const [p, s, st, pr, rt, br] = await Promise.all([
-          fetchFreshData("Merch_Visit_Product_Audit_Logs", false),
-          fetchFreshData("Merch_Visit_Shelf_Audit_Logs", false),
-          fetchFreshData("Store_Retailer_DB", false),
-          fetchFreshData("products_DB", false),
-          fetchFreshData("retailers_DB", false),
-          fetchFreshData("brands_DB", false)
+          fetchFreshData("Merch_Visit_Product_Audit_Logs", true),
+          fetchFreshData("Merch_Visit_Shelf_Audit_Logs", true),
+          fetchFreshData("Store_Retailer_DB", true),
+          fetchFreshData("products_DB", true),
+          fetchFreshData("retailers_DB", true),
+          fetchFreshData("brands_DB", true)
         ]);
         setProductLogs(p);
         setShelfLogs(s);
@@ -200,6 +205,7 @@ export function StoresVisibilityModule({ profile }: StoresVisibilityModuleProps)
         setRetailers(rt);
         setBrands(br);
         setSyncStatus("synced");
+        showToast("Database cache refreshed from Google Sheets!", "success");
       } catch (err: any) {
         showToast("Failed to refresh database: " + err.message, "error");
       } finally {

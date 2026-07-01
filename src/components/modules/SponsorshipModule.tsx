@@ -1,0 +1,1777 @@
+"use client";
+
+import * as React from "react";
+import { NavigationTabs } from "../navigation-tabs";
+import { CustomButton } from "../custom-button";
+import { showToast } from "@/lib/toast";
+import { 
+  TrendingUp, 
+  Coins, 
+  Users, 
+  FileText, 
+  Printer, 
+  Plus, 
+  Pencil, 
+  Trash2, 
+  Calendar, 
+  RefreshCw 
+} from "lucide-react";
+
+interface SponsorshipModuleProps {
+  profile?: {
+    role: string;
+  } | null;
+}
+
+interface SkuLink {
+  id: string;
+  brandName: string;
+  sku: string;
+  productName: string;
+  uom: number;
+  cost: number;
+}
+
+interface Receiver {
+  id: string;
+  name: string;
+  type: "monthly" | "onetime" | "open";
+  limit: number | null; // in cartons
+}
+
+interface Transaction {
+  id: string;
+  ref: string;
+  date: number; // numeric Unix epoch timestamp (milliseconds)
+  receiverId: string;
+  skuId: string; // link to SkuLink
+  qtyPcs: number;
+  remark: string;
+}
+
+// --- CUSTOM SEARCHABLE SELECT FILTER COMPONENT ---
+interface SearchableSelectProps {
+  options: Array<{ value: string; label: string }>;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  disabled?: boolean;
+  className?: string;
+}
+
+function SearchableSelect({ options, value, onChange, placeholder, disabled = false, className = "" }: SearchableSelectProps) {
+  const [search, setSearch] = React.useState("");
+  const [isOpen, setIsOpen] = React.useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  // Close list on clicking outside
+  React.useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Sync typed search string with selected option label
+  React.useEffect(() => {
+    const selectedOption = options.find(o => o.value === value);
+    setSearch(selectedOption ? selectedOption.label : "");
+  }, [value, options]);
+
+  const filteredOptions = React.useMemo(() => {
+    if (!search || (options.find(o => o.value === value)?.label === search)) {
+      return options;
+    }
+    const query = search.toLowerCase();
+    return options.filter(o => o.label.toLowerCase().includes(query));
+  }, [search, options, value]);
+
+  return (
+    <div ref={containerRef} className="relative w-full">
+      <input
+        type="text"
+        disabled={disabled}
+        value={search}
+        onChange={(e) => {
+          setSearch(e.target.value);
+          setIsOpen(true);
+          if (!e.target.value) {
+            onChange("");
+          }
+        }}
+        onFocus={() => {
+          if (!disabled) setIsOpen(true);
+        }}
+        placeholder={placeholder}
+        className={`w-full bg-zinc-50 border border-zinc-300 rounded-lg h-8 px-2.5 text-zinc-900 font-medium text-xs focus:outline-none focus:border-zinc-400 disabled:opacity-50 ${className}`}
+      />
+      {isOpen && !disabled && (
+        <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white border border-zinc-300 rounded-lg shadow-lg z-30 text-xs text-left">
+          {filteredOptions.length === 0 ? (
+            <div className="p-2.5 text-zinc-400 italic">No matches found</div>
+          ) : (
+            filteredOptions.map((opt) => (
+              <div
+                key={opt.value}
+                onClick={() => {
+                  onChange(opt.value);
+                  setSearch(opt.label);
+                  setIsOpen(false);
+                }}
+                className={`p-2.5 cursor-pointer hover:bg-zinc-100 flex items-center justify-between ${
+                  value === opt.value ? "bg-zinc-100 font-bold" : ""
+                }`}
+              >
+                <span>{opt.label}</span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
+  const tabs = [
+    { id: "dashboard", label: "Dashboard", desc: "Overview of sponsorship distribution." },
+    { id: "transaction", label: "Transaction", desc: "Record and manage distribution outputs." },
+    { id: "sponsored", label: "Sponsored By", desc: "Configure brand owners and sponsored product SKUs." },
+    { id: "receiver", label: "Receiver", desc: "Manage receiving entities and limits." }
+  ];
+
+  const [activeTab, setActiveTab] = React.useState<string>("dashboard");
+  const [fetching, setFetching] = React.useState<boolean>(false);
+
+  // Core database sources
+  const [brandsList, setBrandsList] = React.useState<any[]>([]);
+  const [productsList, setProductsList] = React.useState<any[]>([]);
+
+  // Sponsorship local states
+  const [catalog, setCatalog] = React.useState<SkuLink[]>([]);
+  const [receivers, setReceivers] = React.useState<Receiver[]>([]);
+  const [transactions, setTransactions] = React.useState<Transaction[]>([]);
+
+  // Transaction form states
+  const [txId, setTxId] = React.useState<string | null>(null);
+  const [txRef, setTxRef] = React.useState<string>("");
+  const [txDate, setTxDate] = React.useState<string>("");
+  const [txReceiverId, setTxReceiverId] = React.useState<string>("");
+  const [txSkuId, setTxSkuId] = React.useState<string>("");
+  const [txQty, setTxQty] = React.useState<string>("");
+  const [txRemark, setTxRemark] = React.useState<string>("");
+  const [txItems, setTxItems] = React.useState<Array<{ skuId: string; qtyPcs: number }>>([]);
+
+  // Sponsored form states
+  const [selectedBrand, setSelectedBrand] = React.useState<string>("");
+  const [selectedProductSku, setSelectedProductSku] = React.useState<string>("");
+
+  // Receiver form states
+  const [recName, setRecName] = React.useState<string>("");
+  const [recType, setRecType] = React.useState<"monthly" | "onetime" | "open">("monthly");
+  const [recLimit, setRecLimit] = React.useState<string>("");
+
+  // Dashboard filter state
+  const [dashFilter, setDashFilter] = React.useState<string>("3");
+
+  // Claim statement print modal states
+  const [isPrintModalOpen, setIsPrintModalOpen] = React.useState<boolean>(false);
+  const [printBrandName, setPrintBrandName] = React.useState<string>("");
+  const [printStartDate, setPrintStartDate] = React.useState<string>("");
+  const [printEndDate, setPrintEndDate] = React.useState<string>("");
+
+  // Load static DBs and sponsorship outbox state on mount
+  React.useEffect(() => {
+    loadCachedSponsorshipData();
+    fetchAllFreshData(false);
+  }, []);
+
+  const loadCachedSponsorshipData = () => {
+    try {
+      const cachedBrands = localStorage.getItem("brands_DB_data");
+      const cachedProducts = localStorage.getItem("products_DB_data");
+      const cachedCatalog = localStorage.getItem("sponsorship_catalog_data");
+      const cachedReceivers = localStorage.getItem("sponsorship_receivers_data");
+      const cachedTx = localStorage.getItem("sponsorship_transactions_data");
+
+      if (cachedBrands) setBrandsList(JSON.parse(cachedBrands));
+      if (cachedProducts) setProductsList(JSON.parse(cachedProducts));
+
+      if (cachedCatalog) {
+        const items = JSON.parse(cachedCatalog);
+        setCatalog(items.map((item: any) => ({
+          id: item.ID || item.id,
+          brandName: item["Brand Name"] || item.brandName,
+          sku: item.SKU || item.sku,
+          productName: item["Product Name"] || item.productName,
+          uom: parseInt(item.UOM || item.uom) || 24,
+          cost: parseFloat(item.Cost || item.cost) || 0
+        })));
+      }
+      if (cachedReceivers) {
+        const items = JSON.parse(cachedReceivers);
+        setReceivers(items.map((item: any) => ({
+          id: item.ID || item.id,
+          name: item.Name || item.name,
+          type: item.Type || item.type,
+          limit: item.Limit !== undefined && item.Limit !== null && item.Limit !== "" ? parseFloat(item.Limit || item.limit) : null
+        })));
+      }
+      if (cachedTx) {
+        const items = JSON.parse(cachedTx);
+        setTransactions(items.map((item: any) => ({
+          id: item.ID || item.id,
+          ref: item.Ref || item.ref,
+          date: parseInt(item.Date || item.date) || Date.now(),
+          receiverId: item["Receiver ID"] || item.receiverId,
+          skuId: item["SKU ID"] || item.skuId,
+          qtyPcs: parseInt(item["Qty Pcs"] || item.qtyPcs) || 0,
+          remark: item.Remark || item.remark || ""
+        })));
+      }
+    } catch (e) {
+      console.warn("Failed to load cached sponsorship data:", e);
+    }
+  };
+
+  // Helper to make updates to server
+  const writeToDatabase = async (sheetName: string, action: string, data: any) => {
+    try {
+      const res = await fetch("https://ib.hsgglobalpteltd.workers.dev/api/admin/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sheet: sheetName,
+          action,
+          data
+        })
+      });
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+      const result = await res.json();
+      if (!result.success) throw new Error(result.error || "Update failed");
+      return true;
+    } catch (err: any) {
+      console.error("Database write error:", err);
+      throw err;
+    }
+  };
+
+  // Fetch all sheets fresh from server
+  const fetchAllFreshData = async (forceSync = false) => {
+    setFetching(true);
+    try {
+      const sheets: Array<"brands_DB" | "products_DB" | "sponsorship_catalog" | "sponsorship_receivers" | "sponsorship_transactions"> = [
+        "brands_DB",
+        "products_DB",
+        "sponsorship_catalog",
+        "sponsorship_receivers",
+        "sponsorship_transactions"
+      ];
+
+      if (forceSync) {
+        showToast("Updating database caches from Google Sheets...", "info");
+        await Promise.all(
+          sheets.map(sheet => 
+            fetch(`https://ib.hsgglobalpteltd.workers.dev/api/admin/cache?sheet=${sheet}`, { method: "POST" })
+          )
+        );
+      }
+
+      const [brands, products, catalogData, receiversData, transactionsData] = await Promise.all(
+        sheets.map(async sheet => {
+          const res = await fetch(`https://ib.hsgglobalpteltd.workers.dev/api/admin/cache?sheet=${sheet}`);
+          if (!res.ok) return [];
+          const json = await res.json();
+          const items = Array.isArray(json) ? json : (json.value || []);
+          localStorage.setItem(`${sheet}_data`, JSON.stringify(items));
+          return items;
+        })
+      );
+
+      setBrandsList(brands);
+      setProductsList(products);
+      
+      const newCatalog = catalogData.map((item: any) => ({
+        id: item.ID,
+        brandName: item["Brand Name"],
+        sku: item.SKU,
+        productName: item["Product Name"],
+        uom: parseInt(item.UOM) || 24,
+        cost: parseFloat(item.Cost) || 0
+      }));
+      setCatalog(newCatalog);
+      localStorage.setItem("sponsorship_catalog_data", JSON.stringify(catalogData));
+
+      const newReceivers = receiversData.map((item: any) => ({
+        id: item.ID,
+        name: item.Name,
+        type: item.Type,
+        limit: item.Limit !== null && item.Limit !== "" ? parseFloat(item.Limit) : null
+      }));
+      setReceivers(newReceivers);
+      localStorage.setItem("sponsorship_receivers_data", JSON.stringify(receiversData));
+
+      const newTransactions = transactionsData.map((item: any) => ({
+        id: item.ID,
+        ref: item.Ref,
+        date: parseInt(item.Date) || Date.now(),
+        receiverId: item["Receiver ID"],
+        skuId: item["SKU ID"],
+        qtyPcs: parseInt(item["Qty Pcs"]) || 0,
+        remark: item.Remark || ""
+      }));
+      setTransactions(newTransactions);
+      localStorage.setItem("sponsorship_transactions_data", JSON.stringify(transactionsData));
+
+      if (forceSync) {
+        showToast("Database updated successfully!", "success");
+      }
+    } catch (err: any) {
+      showToast("Failed to refresh records: " + err.message, "error");
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  // Convert Date string to Unix epoch timestamp (milliseconds) for storage
+  const dateToEpoch = (dateStr: string): number => {
+    if (!dateStr) return Date.now();
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? Date.now() : d.getTime();
+  };
+
+  // Convert Epoch to YYYY-MM-DD for date inputs
+  const epochToInputVal = (epoch: number): string => {
+    try {
+      const d = new Date(epoch);
+      return d.toISOString().split("T")[0];
+    } catch (e) {
+      return "";
+    }
+  };
+
+  // Format Unix epoch timestamp (milliseconds) as dd/mm/yyyy for UI
+  const formatEpochToDDMMYYYY = (epoch: number): string => {
+    try {
+      const d = new Date(epoch);
+      const dd = String(d.getDate()).padStart(2, "0");
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const yyyy = d.getFullYear();
+      return `${dd}/${mm}/${yyyy}`;
+    } catch (e) {
+      return "-";
+    }
+  };
+
+  // --- CATALOG (SPONSORED BY) LOGIC ---
+  const filteredProductsSelect = React.useMemo(() => {
+    if (!selectedBrand) return [];
+    const targetBrand = brandsList.find(b => String(b.ID) === selectedBrand || b["Display Name"] === selectedBrand);
+    const targetBrandId = targetBrand ? String(targetBrand.ID) : selectedBrand;
+    
+    return productsList.filter(p => String(p["Brands ID"]) === targetBrandId || p["Brand Name"] === selectedBrand);
+  }, [selectedBrand, productsList, brandsList]);
+
+  const handleAddCatalog = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedBrand || !selectedProductSku) {
+      showToast("Please select a brand owner and sponsored product SKU.", "error");
+      return;
+    }
+
+    const brand = brandsList.find(b => String(b.ID) === selectedBrand || b["Display Name"] === selectedBrand);
+    const brandName = brand ? brand["Display Name"] : selectedBrand;
+
+    const product = productsList.find(p => p.SKU === selectedProductSku);
+    if (!product) {
+      showToast("Product SKU not found in database.", "error");
+      return;
+    }
+
+    const uom = parseInt(product.Carton) || 24;
+    const cost = parseFloat(product.Cost) || 0;
+
+    const exists = catalog.some(c => c.sku === selectedProductSku && c.brandName === brandName);
+    if (exists) {
+      showToast("This Brand SKU sponsorship is already in the catalog.", "error");
+      return;
+    }
+
+    const newId = "link_" + Date.now();
+    const newLinkData = {
+      ID: newId,
+      "Brand Name": brandName,
+      SKU: selectedProductSku,
+      "Product Name": product["Display Name"] || "N/A",
+      UOM: uom,
+      Cost: cost
+    };
+
+    // --- INSTANT FRONTEND UPDATE ---
+    const updated = [...catalog, {
+      id: newId,
+      brandName,
+      sku: selectedProductSku,
+      productName: newLinkData["Product Name"],
+      uom,
+      cost
+    }];
+    setCatalog(updated);
+    localStorage.setItem("sponsorship_catalog_data", JSON.stringify(updated.map(c => ({
+      ID: c.id,
+      "Brand Name": c.brandName,
+      SKU: c.sku,
+      "Product Name": c.productName,
+      UOM: c.uom,
+      Cost: c.cost
+    }))));
+    setSelectedProductSku("");
+    showToast("Product added to catalog.", "success");
+
+    // --- SILENT BACKGROUND SAVE ---
+    writeToDatabase("sponsorship_catalog", "insert", newLinkData)
+      .catch((err) => {
+        showToast("Background sync failed for catalog item: " + err.message, "warning");
+      });
+  };
+
+  const handleDeleteCatalog = (id: string) => {
+    const isUsed = transactions.some(t => t.skuId === id);
+    if (isUsed) {
+      showToast("Cannot remove product. It is referenced in distribution history.", "error");
+      return;
+    }
+
+    // --- INSTANT FRONTEND UPDATE ---
+    const updated = catalog.filter(c => c.id !== id);
+    setCatalog(updated);
+    localStorage.setItem("sponsorship_catalog_data", JSON.stringify(updated.map(c => ({
+      ID: c.id,
+      "Brand Name": c.brandName,
+      SKU: c.sku,
+      "Product Name": c.productName,
+      UOM: c.uom,
+      Cost: c.cost
+    }))));
+    showToast("Sponsorship deleted.", "success");
+
+    // --- SILENT BACKGROUND SAVE ---
+    writeToDatabase("sponsorship_catalog", "delete", { ID: id })
+      .catch((err) => {
+        showToast("Background sync failed to delete catalog item: " + err.message, "warning");
+      });
+  };
+
+  // --- RECEIVER LOGIC ---
+  const calculateGivenCartons = (receiverId: string, limitType: string, targetDateEpoch: number = Date.now()) => {
+    const targetDate = new Date(targetDateEpoch);
+    const targetMonth = targetDate.getMonth();
+    const targetYear = targetDate.getFullYear();
+
+    let relevantTx = transactions.filter(t => t.receiverId === receiverId);
+
+    if (limitType === "monthly") {
+      relevantTx = relevantTx.filter(t => {
+        const txDate = new Date(t.date);
+        return txDate.getMonth() === targetMonth && txDate.getFullYear() === targetYear;
+      });
+    }
+
+    return relevantTx.reduce((sum, t) => {
+      const link = catalog.find(c => c.id === t.skuId);
+      const uom = link ? link.uom : 1;
+      return sum + (t.qtyPcs / uom);
+    }, 0);
+  };
+
+  const handleAddReceiver = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!recName.trim()) {
+      showToast("Please enter an entity name.", "error");
+      return;
+    }
+
+    let limit: number | null = null;
+    if (recType !== "open") {
+      limit = parseFloat(recLimit);
+      if (isNaN(limit) || limit <= 0) {
+        showToast("Please enter a valid carton limit.", "error");
+        return;
+      }
+    }
+
+    const newId = "rec_" + Date.now();
+    const newRecData = {
+      ID: newId,
+      Name: recName.trim(),
+      Type: recType,
+      Limit: limit !== null ? limit : ""
+    };
+
+    // --- INSTANT FRONTEND UPDATE ---
+    const updated = [...receivers, {
+      id: newId,
+      name: newRecData.Name,
+      type: recType,
+      limit
+    }];
+    setReceivers(updated);
+    localStorage.setItem("sponsorship_receivers_data", JSON.stringify(updated.map(r => ({
+      ID: r.id,
+      Name: r.name,
+      Type: r.type,
+      Limit: r.limit !== null ? r.limit : ""
+    }))));
+    setRecName("");
+    setRecLimit("");
+    showToast("Receiver registered.", "success");
+
+    // --- SILENT BACKGROUND SAVE ---
+    writeToDatabase("sponsorship_receivers", "insert", newRecData)
+      .catch((err) => {
+        showToast("Background sync failed for receiver: " + err.message, "warning");
+      });
+  };
+
+  const handleDeleteReceiver = (id: string) => {
+    const isUsed = transactions.some(t => t.receiverId === id);
+    if (isUsed) {
+      showToast("Cannot remove receiver. Transactions are logged under this entity.", "error");
+      return;
+    }
+
+    // --- INSTANT FRONTEND UPDATE ---
+    const updated = receivers.filter(r => r.id !== id);
+    setReceivers(updated);
+    localStorage.setItem("sponsorship_receivers_data", JSON.stringify(updated.map(r => ({
+      ID: r.id,
+      Name: r.name,
+      Type: r.type,
+      Limit: r.limit !== null ? r.limit : ""
+    }))));
+    showToast("Receiver removed.", "success");
+
+    // --- SILENT BACKGROUND SAVE ---
+    writeToDatabase("sponsorship_receivers", "delete", { ID: id })
+      .catch((err) => {
+        showToast("Background sync failed to delete receiver: " + err.message, "warning");
+      });
+  };
+
+  // --- TRANSACTION LOGIC ---
+  const handleAddItemToList = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!txSkuId || !txQty) {
+      showToast("Select a SKU and enter quantity first.", "error");
+      return;
+    }
+    const qty = parseInt(txQty);
+    if (isNaN(qty) || qty <= 0) {
+      showToast("Quantity must be a positive number.", "error");
+      return;
+    }
+    if (txItems.some(item => item.skuId === txSkuId)) {
+      showToast("SKU already added in this transaction list. Remove it first to re-add.", "warning");
+      return;
+    }
+    setTxItems(prev => [...prev, { skuId: txSkuId, qtyPcs: qty }]);
+    setTxSkuId("");
+    setTxQty("");
+  };
+
+  const currentBalanceStatus = React.useMemo(() => {
+    if (!txReceiverId) return { ok: true, msg: "Select a receiver" };
+    const rec = receivers.find(r => r.id === txReceiverId);
+    if (!rec) return { ok: true, msg: "" };
+
+    const selectedEpoch = txDate ? dateToEpoch(txDate) : Date.now();
+    const givenCartons = calculateGivenCartons(rec.id, rec.type, selectedEpoch);
+
+    if (rec.type === "open") {
+      return { ok: true, msg: `Balance OK: Unlimited cartons.` };
+    }
+
+    let remaining = rec.limit! - givenCartons;
+
+    if (txId) {
+      const editingTx = transactions.find(t => t.id === txId);
+      if (editingTx && editingTx.receiverId === txReceiverId) {
+        let adjust = false;
+        if (rec.type === "onetime") adjust = true;
+        if (rec.type === "monthly") {
+          const editDate = new Date(editingTx.date);
+          const selDate = new Date(selectedEpoch);
+          if (editDate.getMonth() === selDate.getMonth() && editDate.getFullYear() === selDate.getFullYear()) {
+            adjust = true;
+          }
+        }
+        if (adjust) {
+          const link = catalog.find(c => c.id === editingTx.skuId);
+          const uom = link ? link.uom : 1;
+          remaining += (editingTx.qtyPcs / uom);
+        }
+      }
+    }
+
+    const requestedCartons = txItems.reduce((sum, item) => {
+      const link = catalog.find(c => c.id === item.skuId);
+      const uom = link ? link.uom : 24;
+      return sum + (item.qtyPcs / uom);
+    }, 0);
+
+    if (remaining <= 0) {
+      return { 
+        ok: false, 
+        msg: `LIMIT EXCEEDED: Entity reached limit of ${rec.limit} cartons.`, 
+        warningClass: "text-red-600 font-bold" 
+      };
+    }
+
+    if (requestedCartons > remaining) {
+      return { 
+        ok: false, 
+        msg: `LIMIT WARNING: Items (${requestedCartons.toFixed(1)} ctn) exceed remaining balance (${remaining.toFixed(1)} ctn).`, 
+        warningClass: "text-amber-600 font-bold" 
+      };
+    }
+
+    const timeFrame = rec.type === "monthly" ? "this month" : "total";
+    return { 
+      ok: true, 
+      msg: `Balance OK: ${remaining.toFixed(1)} cartons remaining ${timeFrame}.`, 
+      warningClass: "text-green-600" 
+    };
+  }, [txReceiverId, txDate, txItems, txId, receivers, transactions, catalog]);
+
+  const handleTransactionSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!txRef.trim() || !txDate || !txReceiverId || txItems.length === 0) {
+      showToast("Please fill in Ref, Date, Receiver and add at least one SKU.", "error");
+      return;
+    }
+
+    const epochMs = dateToEpoch(txDate);
+    const isEdit = !!txId;
+
+    const rec = receivers.find(r => r.id === txReceiverId);
+    if (rec && rec.type !== "open") {
+      const given = calculateGivenCartons(rec.id, rec.type, epochMs);
+      let remaining = rec.limit! - given;
+
+      if (isEdit) {
+        const editingTx = transactions.find(t => t.id === txId);
+        if (editingTx && editingTx.receiverId === txReceiverId) {
+          let adjust = false;
+          if (rec.type === "onetime") adjust = true;
+          if (rec.type === "monthly") {
+            const editDate = new Date(editingTx.date);
+            const selDate = new Date(epochMs);
+            if (editDate.getMonth() === selDate.getMonth() && editDate.getFullYear() === selDate.getFullYear()) {
+              adjust = true;
+            }
+          }
+          if (adjust) {
+            const link = catalog.find(c => c.id === editingTx.skuId);
+            const uom = link ? link.uom : 1;
+            remaining += (editingTx.qtyPcs / uom);
+          }
+        }
+      }
+
+      const totalCtns = txItems.reduce((sum, item) => {
+        const link = catalog.find(c => c.id === item.skuId);
+        return sum + (item.qtyPcs / (link ? link.uom : 24));
+      }, 0);
+
+      if (remaining <= 0 || totalCtns > remaining) {
+        showToast("Warning: This transaction exceeds receiver limits.", "warning");
+      }
+    }
+
+    // --- SILENT BACKGROUND SAVE FOR EACH ITEM ---
+    txItems.forEach((item, index) => {
+      const targetId = (isEdit && index === 0) ? txId : `tx_${Date.now()}_${index}`;
+      const action = (isEdit && index === 0) ? "update" : "insert";
+
+      const txPayload = {
+        ID: targetId,
+        Ref: txRef.trim(),
+        Date: epochMs,
+        "Receiver ID": txReceiverId,
+        "SKU ID": item.skuId,
+        "Qty Pcs": item.qtyPcs,
+        Remark: txRemark.trim()
+      };
+
+      writeToDatabase("sponsorship_transactions", action, txPayload)
+        .catch((err) => {
+          showToast(`Background sync failed for SKU [${targetId}]: ` + err.message, "warning");
+        });
+    });
+
+    // --- INSTANT OPTIMISTIC FRONTEND UPDATE ---
+    let updatedTransactions = [...transactions];
+    if (isEdit) {
+      updatedTransactions = updatedTransactions.filter(t => t.id !== txId);
+    }
+
+    const newTxList = txItems.map((item, index) => ({
+      id: (isEdit && index === 0) ? txId : `tx_${Date.now()}_${index}`,
+      ref: txRef.trim(),
+      date: epochMs,
+      receiverId: txReceiverId,
+      skuId: item.skuId,
+      qtyPcs: item.qtyPcs,
+      remark: txRemark.trim()
+    }));
+
+    const finalTransactions = [...newTxList, ...updatedTransactions];
+    setTransactions(finalTransactions);
+    localStorage.setItem("sponsorship_transactions_data", JSON.stringify(finalTransactions.map(t => ({
+      ID: t.id,
+      Ref: t.ref,
+      Date: t.date,
+      "Receiver ID": t.receiverId,
+      "SKU ID": t.skuId,
+      "Qty Pcs": t.qtyPcs,
+      Remark: t.remark
+    }))));
+
+    // Reset Form states
+    setTxId(null);
+    setTxRef("");
+    setTxQty("");
+    setTxRemark("");
+    setTxSkuId("");
+    setTxReceiverId("");
+    setTxItems([]);
+
+    showToast(isEdit ? "Transaction updated." : "Transaction logged.", "success");
+  };
+
+  const handleEditTransaction = (id: string) => {
+    const tx = transactions.find(t => t.id === id);
+    if (!tx) return;
+
+    setTxId(tx.id);
+    setTxRef(tx.ref);
+    setTxDate(epochToInputVal(tx.date));
+    setTxReceiverId(tx.receiverId);
+    setTxRemark(tx.remark);
+    
+    setTxItems([{ skuId: tx.skuId, qtyPcs: tx.qtyPcs }]);
+    
+    showToast("Editing transaction entry...", "info");
+  };
+
+  const handleDeleteTransaction = (id: string) => {
+    // --- INSTANT FRONTEND UPDATE ---
+    const updated = transactions.filter(t => t.id !== id);
+    setTransactions(updated);
+    localStorage.setItem("sponsorship_transactions_data", JSON.stringify(updated.map(t => ({
+      ID: t.id,
+      Ref: t.ref,
+      Date: t.date,
+      "Receiver ID": t.receiverId,
+      "SKU ID": t.skuId,
+      "Qty Pcs": t.qtyPcs,
+      Remark: t.remark
+    }))));
+    showToast("Transaction deleted.", "success");
+
+    // --- SILENT BACKGROUND SAVE ---
+    writeToDatabase("sponsorship_transactions", "delete", { ID: id })
+      .catch((err) => {
+        showToast("Background sync failed to delete transaction: " + err.message, "warning");
+      });
+  };
+
+  const handleCancelTxEdit = () => {
+    setTxId(null);
+    setTxRef("");
+    setTxQty("");
+    setTxRemark("");
+    setTxSkuId("");
+    setTxReceiverId("");
+    setTxDate(epochToInputVal(Date.now()));
+    setTxItems([]);
+  };
+
+  // --- DASHBOARD MATHS ---
+  const dashboardStats = React.useMemo(() => {
+    const filterMonths = dashFilter;
+    const now = new Date();
+    const cutoff = new Date();
+    cutoff.setMonth(now.getMonth() - (filterMonths === "all" ? 120 : parseInt(filterMonths)));
+
+    const filtered = transactions.filter(t => new Date(t.date) >= cutoff);
+
+    let totalCartons = 0;
+    let totalCost = 0;
+
+    filtered.forEach(t => {
+      const link = catalog.find(c => c.id === t.skuId);
+      if (link) {
+        const ctns = t.qtyPcs / link.uom;
+        totalCartons += ctns;
+        totalCost += (t.qtyPcs * link.cost);
+      }
+    });
+
+    const summaryMap: Record<string, Record<string, { ctns: number; cost: number; skuCode: string }>> = {};
+    filtered.forEach(t => {
+      const link = catalog.find(c => c.id === t.skuId);
+      if (link) {
+        if (!summaryMap[link.brandName]) summaryMap[link.brandName] = {};
+        if (!summaryMap[link.brandName][link.productName]) {
+          summaryMap[link.brandName][link.productName] = { ctns: 0, cost: 0, skuCode: link.sku };
+        }
+        const ctns = t.qtyPcs / link.uom;
+        summaryMap[link.brandName][link.productName].ctns += ctns;
+        summaryMap[link.brandName][link.productName].cost += (t.qtyPcs * link.cost);
+      }
+    });
+
+    const summaryList: Array<{ brand: string; skuName: string; skuCode: string; ctns: number; cost: number }> = [];
+    for (const brand in summaryMap) {
+      for (const skuName in summaryMap[brand]) {
+        summaryList.push({
+          brand,
+          skuName,
+          skuCode: summaryMap[brand][skuName].skuCode,
+          ctns: summaryMap[brand][skuName].ctns,
+          cost: summaryMap[brand][skuName].cost
+        });
+      }
+    }
+
+    return {
+      totalCartons,
+      totalTransactions: filtered.length,
+      totalCost,
+      summaryList
+    };
+  }, [dashFilter, transactions, catalog]);
+
+  // --- PRINTING / REPORT GENERATION ---
+  const handlePrintClaim = () => {
+    if (!printBrandName) return;
+
+    let startEpoch = 0;
+    let endEpoch = Infinity;
+
+    if (printStartDate) {
+      startEpoch = new Date(printStartDate).setHours(0, 0, 0, 0);
+    }
+    if (printEndDate) {
+      endEpoch = new Date(printEndDate).setHours(23, 59, 59, 999);
+    }
+
+    const relevantTx = transactions.filter(t => {
+      const link = catalog.find(c => c.id === t.skuId);
+      if (!link || link.brandName !== printBrandName) return false;
+      if (t.date < startEpoch) return false;
+      if (t.date > endEpoch) return false;
+      return true;
+    });
+
+    if (relevantTx.length === 0) {
+      showToast(`No logged distributions found for ${printBrandName} in the selected period.`, "warning");
+      return;
+    }
+
+    setIsPrintModalOpen(false);
+
+    let periodText = "All Time";
+    if (printStartDate && printEndDate) {
+      periodText = `${formatEpochToDDMMYYYY(new Date(printStartDate).getTime())} - ${formatEpochToDDMMYYYY(new Date(printEndDate).getTime())}`;
+    } else if (printStartDate) {
+      periodText = `From ${formatEpochToDDMMYYYY(new Date(printStartDate).getTime())}`;
+    } else if (printEndDate) {
+      periodText = `Up to ${formatEpochToDDMMYYYY(new Date(printEndDate).getTime())}`;
+    }
+
+    // helper to format cartons and loose pieces
+    const formatCartonAndLoose = (totalPcs: number, uom: number): string => {
+      const cartons = Math.floor(totalPcs / uom);
+      const loose = totalPcs % uom;
+      if (cartons > 0 && loose > 0) {
+        return `${cartons} ctn, ${loose} pcs`;
+      } else if (cartons > 0) {
+        return `${cartons} ctn`;
+      } else {
+        return `${loose} pcs`;
+      }
+    };
+
+    // SECTION 1: Product Summary grouping by SKU
+    // Columns: Brands, Product, Carton Given Qty Carton and Loose, Cost Value
+    const summaryMap: Record<string, { brandName: string; productDisplay: string; totalPcs: number; cost: number; uom: number }> = {};
+    relevantTx.forEach(t => {
+      const link = catalog.find(c => c.id === t.skuId);
+      if (!link) return;
+      const productDisplay = `[${link.sku}] ${link.productName}`;
+      const lineCost = t.qtyPcs * link.cost;
+
+      if (!summaryMap[t.skuId]) {
+        summaryMap[t.skuId] = {
+          brandName: link.brandName,
+          productDisplay,
+          totalPcs: 0,
+          cost: 0,
+          uom: link.uom
+        };
+      }
+      summaryMap[t.skuId].totalPcs += t.qtyPcs;
+      summaryMap[t.skuId].cost += lineCost;
+    });
+
+    let section1RowsHtml = "";
+    let totalClaim = 0;
+    Object.values(summaryMap).forEach(item => {
+      totalClaim += item.cost;
+      const cartonLooseStr = formatCartonAndLoose(item.totalPcs, item.uom);
+      section1RowsHtml += `
+        <tr style="border-bottom: 1px solid #e2e8f0;">
+          <td style="padding: 8px 10px; font-size: 12px;">${item.brandName}</td>
+          <td style="padding: 8px 10px; font-size: 12px;">${item.productDisplay}</td>
+          <td style="padding: 8px 10px; font-size: 12px; text-align: right;">${cartonLooseStr}</td>
+          <td style="padding: 8px 10px; font-size: 12px; text-align: right;">$${item.cost.toFixed(2)}</td>
+        </tr>
+      `;
+    });
+
+    // SECTION 2: Particular details grouped by Doc (Ref) Number
+    // Columns: Doc Number and Date | Receiver & Remark | Products | Qty | Cost
+    // Small text font size 4-5px
+    const docGroups: Record<string, { ref: string; date: number; receiverName: string; remark: string; items: Array<{ productDisplay: string; qtyPcs: number; cost: number }> }> = {};
+    relevantTx.forEach(t => {
+      const link = catalog.find(c => c.id === t.skuId);
+      if (!link) return;
+      const rec = receivers.find(r => r.id === t.receiverId);
+      const receiverName = rec ? rec.name : "N/A";
+      const productDisplay = `[${link.sku}] ${link.productName}`;
+      const lineCost = t.qtyPcs * link.cost;
+
+      if (!docGroups[t.ref]) {
+        docGroups[t.ref] = {
+          ref: t.ref,
+          date: t.date,
+          receiverName,
+          remark: t.remark || "-",
+          items: []
+        };
+      }
+      docGroups[t.ref].items.push({
+        productDisplay,
+        qtyPcs: t.qtyPcs,
+        cost: lineCost
+      });
+    });
+
+    // Sort by date ascending to make a clear chronological audit trail
+    const sortedDocGroups = Object.values(docGroups).sort((a, b) => a.date - b.date);
+
+    let section2RowsHtml = "";
+    sortedDocGroups.forEach(group => {
+      group.items.forEach((item, index) => {
+        const isFirst = index === 0;
+        section2RowsHtml += `
+          <tr style="border-bottom: 1px solid #f1f5f9; font-size: 6px; font-family: monospace;">
+            <td style="padding: 2px 4px; vertical-align: top; border-right: 1px solid #f1f5f9;">
+              ${isFirst ? `<strong>${group.ref}</strong><br/><span style="color: #64748b;">${formatEpochToDDMMYYYY(group.date)}</span>` : ""}
+            </td>
+            <td style="padding: 2px 4px; vertical-align: top; border-right: 1px solid #f1f5f9; word-break: break-all; max-width: 150px;">
+              ${isFirst ? `<strong>${group.receiverName}</strong><br/><span style="color: #64748b; font-style: italic;">${group.remark}</span>` : ""}
+            </td>
+            <td style="padding: 2px 4px; vertical-align: top; border-right: 1px solid #f1f5f9;">
+              ${item.productDisplay}
+            </td>
+            <td style="padding: 2px 4px; vertical-align: top; text-align: right;">
+              ${item.qtyPcs} pcs
+            </td>
+          </tr>
+        `;
+      });
+    });
+
+    const printHtml = `
+      <html>
+        <head>
+          <title>Claim Statement - ${printBrandName}</title>
+          <style>
+            body { font-family: 'Inter', sans-serif; color: #1e293b; padding: 40px; margin: 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 25px; }
+            th { background-color: #f1f5f9; padding: 10px 8px; font-size: 11px; font-weight: bold; text-transform: uppercase; text-align: left; }
+            .section2-th { font-size: 8px; padding: 4px 6px; }
+            .header-flex { display: flex; justify-content: space-between; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; }
+            .total-box { text-align: right; font-size: 18px; font-weight: bold; margin-top: 15px; border-top: 2px solid #e2e8f0; padding-top: 10px; }
+            .section-title { font-size: 14px; font-weight: 800; border-left: 4px solid #3b82f6; padding-left: 10px; margin-top: 30px; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+            .subtext { font-size: 11px; color: #64748b; margin-top: 4px; }
+            @media print {
+              .page-break { page-break-before: always; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header-flex">
+            <div>
+              <h2 style="margin: 0; font-size: 22px; font-weight: 800; color: #0f172a;">CLAIM STATEMENT</h2>
+              <p style="margin: 4px 0 0 0; font-size: 14px; color: #64748b;">HSG Global Pte Ltd</p>
+            </div>
+            <div style="text-align: right;">
+              <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #3b82f6;">${printBrandName}</h3>
+              <p class="subtext">Period: ${periodText}</p>
+              <p class="subtext">Print Date: ${new Date().toLocaleDateString("en-GB")}</p>
+            </div>
+          </div>
+
+          <!-- SECTION 1: Product Summary -->
+          <div class="section-title">Product Summary</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Brands</th>
+                <th>Products</th>
+                <th style="text-align: right;">Given</th>
+                <th style="text-align: right;">Cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${section1RowsHtml}
+            </tbody>
+          </table>
+
+          <div class="total-box">
+            Total Claim Amount: <span style="color: #3563e9;">$${totalClaim.toFixed(2)}</span>
+          </div>
+
+          <!-- Section 2 on new page -->
+          <div class="page-break"></div>
+
+          <!-- SECTION 2: Particular details -->
+          <div class="section-title" style="margin-top: 20px;">Particular Claim Details</div>
+          <p style="font-size: 8px; color: #64748b; margin-bottom: 8px;">Detailed audit logs of transactions grouped by Doc Number (Ref).</p>
+          <table style="border: 1px solid #e2e8f0; width: 100%;">
+            <thead>
+              <tr style="background-color: #f8fafc;">
+                <th class="section2-th" style="width: 25%;">Register Doc</th>
+                <th class="section2-th" style="width: 30%;">Receiver</th>
+                <th class="section2-th" style="width: 35%;">Products</th>
+                <th class="section2-th" style="text-align: right; width: 10%;">Qty</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${section2RowsHtml}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.bottom = "0";
+    iframe.style.right = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "none";
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document || iframe.contentDocument;
+    if (doc) {
+      doc.open();
+      doc.write(printHtml);
+      doc.close();
+
+      setTimeout(() => {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        setTimeout(() => iframe.remove(), 1000);
+      }, 500);
+    }
+  };
+
+  const uniqueCatalogBrands = React.useMemo(() => {
+    return Array.from(new Set(catalog.map(c => c.brandName)));
+  }, [catalog]);
+
+  // --- MEMOIZED SEARCHABLE SELECT DATA SOURCES ---
+  const receiverOptions = React.useMemo(() => {
+    return receivers.map(r => ({ value: r.id, label: `${r.name} (${r.type})` }));
+  }, [receivers]);
+
+  const catalogOptions = React.useMemo(() => {
+    return catalog.map(c => ({ value: c.id, label: `[${c.brandName}] ${c.sku} - ${c.productName}` }));
+  }, [catalog]);
+
+  const brandOptions = React.useMemo(() => {
+    return brandsList.map(b => ({ value: String(b.ID), label: b["Display Name"] }));
+  }, [brandsList]);
+
+  const productOptions = React.useMemo(() => {
+    return filteredProductsSelect.map(p => ({ value: p.SKU, label: `${p.SKU} - ${p["Display Name"]}` }));
+  }, [filteredProductsSelect]);
+
+  return (
+    <div className="flex flex-col gap-6 font-primary text-zinc-900 select-none border-t border-zinc-200 pt-1">
+      
+      {/* Navigation sub-tabs */}
+      <NavigationTabs 
+        tabs={tabs} 
+        activeTabId={activeTab} 
+        onTabSelect={(id) => setActiveTab(id)} 
+        action={
+          <div className="flex gap-2">
+            {activeTab === "dashboard" && (
+              <CustomButton 
+                onClick={() => setIsPrintModalOpen(true)}
+                variant="default"
+              >
+                <Printer size={13} className="text-zinc-500" />
+                Print Claim
+              </CustomButton>
+            )}
+            <CustomButton 
+              onClick={() => fetchAllFreshData(true)}
+              disabled={fetching}
+              variant="secondary"
+            >
+              <RefreshCw size={13} className={`text-zinc-600 ${fetching ? "animate-spin" : ""}`} />
+              Update
+            </CustomButton>
+          </div>
+        }
+      />
+
+      {/* 1. DASHBOARD TAB */}
+      {activeTab === "dashboard" && (
+        <div className="flex flex-col gap-6 animate-tableFadeInOnly">
+          {/* Dashboard Header filters */}
+          <div className="flex justify-between items-center bg-white border border-zinc-300/40 p-4 rounded-xl shadow-sm">
+            <div>
+              <h3 className="font-bold text-zinc-950 text-base">Dashboard Insights</h3>
+              <p className="text-xs text-zinc-500 mt-0.5">Overview of sponsorship quantities and cost value.</p>
+            </div>
+            <select 
+              value={dashFilter}
+              onChange={(e) => setDashFilter(e.target.value)}
+              className="text-xs bg-white border border-zinc-300 rounded-lg p-2 font-bold cursor-pointer text-zinc-700 focus:outline-none focus:border-zinc-400"
+            >
+              <option value="3">Last 3 Months</option>
+              <option value="6">Last 6 Months</option>
+              <option value="9">Last 9 Months</option>
+              <option value="12">Last 12 Months</option>
+              <option value="all">All Time</option>
+            </select>
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="bg-white border border-zinc-300/40 rounded-xl p-5 shadow-sm flex items-center gap-4">
+              <div className="p-3 bg-zinc-100 text-zinc-800 rounded-full border border-zinc-200">
+                <TrendingUp size={22} className="stroke-[2.5]" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Cartons Distributed</p>
+                <p className="text-2xl font-bold text-zinc-900 mt-0.5">{Math.round(dashboardStats.totalCartons)}</p>
+              </div>
+            </div>
+            <div className="bg-white border border-zinc-300/40 rounded-xl p-5 shadow-sm flex items-center gap-4">
+              <div className="p-3 bg-zinc-100 text-zinc-800 rounded-full border border-zinc-200">
+                <FileText size={22} className="stroke-[2.5]" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Total Transactions</p>
+                <p className="text-2xl font-bold text-zinc-900 mt-0.5">{dashboardStats.totalTransactions}</p>
+              </div>
+            </div>
+            <div className="bg-white border border-zinc-300/40 rounded-xl p-5 shadow-sm flex items-center gap-4">
+              <div className="p-3 bg-zinc-100 text-zinc-800 rounded-full border border-zinc-200">
+                <Users size={22} className="stroke-[2.5]" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Registered Receivers</p>
+                <p className="text-2xl font-bold text-zinc-900 mt-0.5">{receivers.length}</p>
+              </div>
+            </div>
+            <div className="bg-white border border-zinc-300/40 rounded-xl p-5 shadow-sm flex items-center gap-4">
+              <div className="p-3 bg-zinc-100 text-zinc-800 rounded-full border border-zinc-200">
+                <Coins size={22} className="stroke-[2.5]" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Est. Value (Cost)</p>
+                <p className="text-2xl font-bold text-zinc-900 mt-0.5">${dashboardStats.totalCost.toFixed(2)}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Recent Summary table */}
+          <div className="bg-white border border-zinc-300/40 rounded-xl shadow-sm overflow-hidden flex flex-col">
+            <div className="px-5 py-3.5 bg-zinc-50 border-b border-zinc-200">
+              <h4 className="font-bold text-zinc-800 text-sm">Zonal Distribution Summary</h4>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-zinc-50 border-b border-zinc-200 text-zinc-500 font-bold uppercase tracking-wider">
+                    <th className="px-6 py-3">Brand Name</th>
+                    <th className="px-6 py-3">SKU</th>
+                    <th className="px-6 py-3">Product Name</th>
+                    <th className="px-6 py-3 text-right">Cartons Given (Filtered)</th>
+                    <th className="px-6 py-3 text-right">Est. Cost Value</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-200 text-zinc-700">
+                  {dashboardStats.summaryList.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="text-center p-8 italic text-zinc-400">
+                        No distribution logs found for the filtered period.
+                      </td>
+                    </tr>
+                  ) : (
+                    dashboardStats.summaryList.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-zinc-50/50">
+                        <td className="px-6 py-4 font-bold text-zinc-900">{item.brand}</td>
+                        <td className="px-6 py-4 font-mono">{item.skuCode}</td>
+                        <td className="px-6 py-4">{item.skuName}</td>
+                        <td className="px-6 py-4 text-right font-bold">{item.ctns.toFixed(2)}</td>
+                        <td className="px-6 py-4 text-right font-bold text-zinc-900">${item.cost.toFixed(2)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. TRANSACTION LOGGING TAB */}
+      {activeTab === "transaction" && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-tableFadeInOnly">
+          {/* Form col */}
+          <div className="bg-white border border-zinc-300/40 p-5 rounded-xl shadow-sm h-fit">
+            <h3 className="font-bold text-zinc-900 border-b pb-2 text-sm uppercase tracking-wider">
+              {txId ? "Edit Entry" : "Log Output Entry"}
+            </h3>
+            <form onSubmit={handleTransactionSubmit} className="flex flex-col gap-4 mt-4 text-xs">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block mb-1 text-zinc-500 font-bold uppercase">Ref Number</label>
+                  <input 
+                    type="text" 
+                    value={txRef}
+                    onChange={(e) => setTxRef(e.target.value)}
+                    placeholder="e.g. DOC-8823"
+                    required
+                    className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block mb-1 text-zinc-500 font-bold uppercase">Date</label>
+                  <input 
+                    type="date" 
+                    value={txDate}
+                    onChange={(e) => setTxDate(e.target.value)}
+                    required
+                    className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block mb-1 text-zinc-500 font-bold uppercase">Receiver Entity</label>
+                <SearchableSelect
+                  options={receiverOptions}
+                  value={txReceiverId}
+                  onChange={(val) => setTxReceiverId(val)}
+                  placeholder="Search and select receiver..."
+                />
+                {txReceiverId && (
+                  <p className={`text-[10px] mt-1.5 font-bold ${currentBalanceStatus.warningClass || "text-zinc-500"}`}>
+                    {currentBalanceStatus.msg}
+                  </p>
+                )}
+              </div>
+
+              {/* SKU Items List section */}
+              <div className="border border-zinc-200 rounded-lg p-3 bg-zinc-50/50 mt-1 flex flex-col gap-3">
+                <span className="font-bold text-[10px] text-zinc-400 uppercase tracking-wider block">Add SKUs to Transaction</span>
+                 <div className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <label className="block mb-1 text-[10px] text-zinc-500 font-semibold uppercase">Sku</label>
+                    <SearchableSelect
+                      options={catalogOptions}
+                      value={txSkuId}
+                      onChange={(val) => setTxSkuId(val)}
+                      placeholder="Search SKU..."
+                    />
+                  </div>
+                  <div className="w-24">
+                    <label className="block mb-1 text-[10px] text-zinc-500 font-semibold uppercase">Qty (Pcs)</label>
+                    <input 
+                      type="number" 
+                      value={txQty}
+                      onChange={(e) => setTxQty(e.target.value)}
+                      placeholder="Pcs"
+                      min={1}
+                      className="w-full h-8 bg-white border border-zinc-300 rounded-lg px-2 text-zinc-900 focus:outline-none text-xs"
+                    />
+                  </div>
+                  <Plus 
+                    size={20} 
+                    onClick={handleAddItemToList}
+                    className="cursor-pointer text-zinc-500 hover:text-zinc-900 transition-colors flex-shrink-0 mb-1.5"
+                  />
+                </div>
+
+                {txItems.length > 0 && (
+                  <div className="mt-2 border-t border-zinc-200 pt-2 flex flex-col gap-1.5 max-h-40 overflow-y-auto">
+                    {txItems.map((item, idx) => {
+                      const link = catalog.find(c => c.id === item.skuId);
+                      const code = link ? link.sku : "N/A";
+                      const itemCost = link ? link.cost : 0;
+                      const totalAmount = item.qtyPcs * itemCost;
+                      return (
+                        <div key={idx} className="flex justify-between items-center bg-white p-2 rounded-lg border border-zinc-200 text-[11px] font-medium">
+                          <div className="truncate pr-2">
+                            <span className="font-bold text-zinc-900">{code}</span>
+                            <span className="text-zinc-500 ml-1.5">({item.qtyPcs} pcs / ${totalAmount.toFixed(2)})</span>
+                          </div>
+                          <Trash2 
+                            size={14} 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setTxItems(prev => prev.filter((_, i) => i !== idx));
+                            }}
+                            className="text-zinc-400 hover:text-red-600 cursor-pointer flex-shrink-0 transition-colors"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block mb-1 text-zinc-500 font-bold uppercase">Remark</label>
+                <textarea 
+                  rows={3}
+                  value={txRemark}
+                  onChange={(e) => setTxRemark(e.target.value)}
+                  placeholder="Optional notes"
+                  className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold resize-none text-xs"
+                />
+              </div>
+              <div className="flex gap-2 mt-2">
+                <CustomButton 
+                  type="submit"
+                  disabled={txItems.length === 0}
+                  variant={txId ? "secondary" : "dark"}
+                  className="flex-1 h-10"
+                >
+                  {txId ? "Update Entry" : "Record Entry"}
+                </CustomButton>
+                {txId && (
+                  <CustomButton 
+                    type="button" 
+                    onClick={handleCancelTxEdit}
+                    variant="default"
+                    className="h-10"
+                  >
+                    Cancel
+                  </CustomButton>
+                )}
+              </div>
+            </form>
+          </div>
+
+          {/* History table col */}
+          <div className="lg:col-span-2 bg-white border border-zinc-300/40 rounded-xl shadow-sm overflow-hidden flex flex-col">
+            <div className="px-5 py-3.5 bg-zinc-50 border-b border-zinc-200">
+              <h4 className="font-bold text-zinc-800 text-sm">Distribution Log History</h4>
+            </div>
+            <div className="overflow-x-auto flex-1">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-zinc-50 border-b border-zinc-200 text-zinc-500 font-bold uppercase tracking-wider">
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Ref No.</th>
+                    <th className="px-4 py-3">Receiver</th>
+                    <th className="px-4 py-3">Brand & SKU</th>
+                    <th className="px-4 py-3 text-right">Pcs</th>
+                    <th className="px-4 py-3 text-right">Total Amount</th>
+                    <th className="px-4 py-3">Remark</th>
+                    <th className="px-4 py-3 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-200 text-zinc-700">
+                  {transactions.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="text-center p-8 italic text-zinc-400">
+                        No transactions logged yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    [...transactions]
+                      .sort((a, b) => b.date - a.date)
+                      .map((tx) => {
+                        const rec = receivers.find(r => r.id === tx.receiverId) || { name: "Unknown" };
+                        const link = catalog.find(c => c.id === tx.skuId) || { brandName: "Unknown", sku: "N/A", uom: 1, cost: 0 };
+                        const totalAmount = tx.qtyPcs * link.cost;
+
+                        return (
+                          <tr key={tx.id} className="hover:bg-zinc-50/50">
+                            <td className="px-4 py-3 whitespace-nowrap font-mono">{formatEpochToDDMMYYYY(tx.date)}</td>
+                            <td className="px-4 py-3 font-bold text-zinc-900">{tx.ref}</td>
+                            <td className="px-4 py-3">{rec.name}</td>
+                            <td className="px-4 py-3">[{link.brandName}] {link.sku}</td>
+                            <td className="px-4 py-3 text-right font-bold">{tx.qtyPcs}</td>
+                            <td className="px-4 py-3 text-right font-bold text-zinc-900">${totalAmount.toFixed(2)}</td>
+                            <td className="px-4 py-3 truncate max-w-xs">{tx.remark}</td>
+                            <td className="px-4 py-3 text-center flex justify-center gap-2">
+                              <Pencil 
+                                size={14} 
+                                onClick={() => handleEditTransaction(tx.id)}
+                                className="text-zinc-400 hover:text-blue-600 cursor-pointer transition-colors"
+                              />
+                              <Trash2 
+                                size={14} 
+                                onClick={() => handleDeleteTransaction(tx.id)}
+                                className="text-zinc-400 hover:text-red-600 cursor-pointer transition-colors"
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. SPONSORED BY TAB */}
+      {activeTab === "sponsored" && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-tableFadeInOnly">
+          {/* Form col */}
+          <div className="bg-white border border-zinc-300/40 p-5 rounded-xl shadow-sm h-fit">
+            <h3 className="font-bold text-zinc-900 border-b pb-2 text-sm uppercase tracking-wider">
+              Add Sponsored Product
+            </h3>
+            <form onSubmit={handleAddCatalog} className="flex flex-col gap-4 mt-4 text-xs">
+              <div>
+                <label className="block mb-1 text-zinc-500 font-bold uppercase">Brand Owner</label>
+                <SearchableSelect
+                  options={brandOptions}
+                  value={selectedBrand}
+                  onChange={(val) => {
+                    setSelectedBrand(val);
+                    setSelectedProductSku("");
+                  }}
+                  placeholder="Search and select brand owner..."
+                />
+              </div>
+              <div>
+                <label className="block mb-1 text-zinc-500 font-bold uppercase">Product SKU</label>
+                <SearchableSelect
+                  options={productOptions}
+                  value={selectedProductSku}
+                  onChange={(val) => setSelectedProductSku(val)}
+                  disabled={!selectedBrand}
+                  placeholder={selectedBrand ? "Search product SKU..." : "Select Brand first"}
+                />
+              </div>
+              {selectedProductSku && (
+                <div className="p-3 bg-zinc-50 rounded-lg border border-zinc-200/80 flex flex-col gap-2 font-medium">
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400 uppercase font-bold text-[10px]">UOM (Pieces/Ctn)</span>
+                    <span className="font-bold text-zinc-900">
+                      {productsList.find(p => p.SKU === selectedProductSku)?.Carton || 24} pcs
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400 uppercase font-bold text-[10px]">Cost per Piece</span>
+                    <span className="font-bold text-zinc-900">
+                      ${parseFloat(productsList.find(p => p.SKU === selectedProductSku)?.Cost || "0").toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400 uppercase font-bold text-[10px]">Cost per Carton</span>
+                    <span className="font-bold text-zinc-900">
+                      ${(parseFloat(productsList.find(p => p.SKU === selectedProductSku)?.Cost || "0") * parseInt(productsList.find(p => p.SKU === selectedProductSku)?.Carton || "24")).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              )}
+              <CustomButton 
+                type="submit"
+                variant="dark"
+                className="w-full mt-2 h-10"
+              >
+                Add to Catalog
+              </CustomButton>
+            </form>
+          </div>
+
+          {/* Table col */}
+          <div className="lg:col-span-2 bg-white border border-zinc-300/40 rounded-xl shadow-sm overflow-hidden flex flex-col">
+            <div className="px-5 py-3.5 bg-zinc-50 border-b border-zinc-200">
+              <h4 className="font-bold text-zinc-800 text-sm">Sponsored Catalog Mappings</h4>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-zinc-50 border-b border-zinc-200 text-zinc-500 font-bold uppercase tracking-wider">
+                    <th className="px-6 py-3">Brand Owner</th>
+                    <th className="px-6 py-3">SKU</th>
+                    <th className="px-6 py-3">Product Name</th>
+                    <th className="px-6 py-3 text-center">UOM (Pcs/Ctn)</th>
+                    <th className="px-6 py-3 text-right">Cost/Pc</th>
+                    <th className="px-6 py-3 text-right">Cost/Ctn</th>
+                    <th className="px-6 py-3 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-200 text-zinc-700">
+                  {catalog.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="text-center p-8 italic text-zinc-400">
+                        No product sponsorships linked yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    catalog.map((item) => (
+                      <tr key={item.id} className="hover:bg-zinc-50/50">
+                        <td className="px-6 py-4 font-bold text-zinc-900">{item.brandName}</td>
+                        <td className="px-6 py-4 font-mono">{item.sku}</td>
+                        <td className="px-6 py-4">{item.productName}</td>
+                        <td className="px-6 py-4 text-center font-bold">{item.uom}</td>
+                        <td className="px-6 py-4 text-right font-bold text-zinc-900">${item.cost.toFixed(2)}</td>
+                        <td className="px-6 py-4 text-right font-bold text-zinc-900">${(item.cost * item.uom).toFixed(2)}</td>
+                        <td className="px-6 py-4 text-center flex justify-center">
+                          <Trash2 
+                            size={14} 
+                            onClick={() => handleDeleteCatalog(item.id)}
+                            className="text-zinc-400 hover:text-red-600 cursor-pointer transition-colors"
+                          />
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. RECEIVER REGISTRY TAB */}
+      {activeTab === "receiver" && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-tableFadeInOnly">
+          {/* Form col */}
+          <div className="bg-white border border-zinc-300/40 p-5 rounded-xl shadow-sm h-fit">
+            <h3 className="font-bold text-zinc-900 border-b pb-2 text-sm uppercase tracking-wider">
+              Register Entity
+            </h3>
+            <form onSubmit={handleAddReceiver} className="flex flex-col gap-4 mt-4 text-xs">
+              <div>
+                <label className="block mb-1 text-zinc-500 font-bold uppercase">Entity Name</label>
+                <input 
+                  type="text" 
+                  value={recName}
+                  onChange={(e) => setRecName(e.target.value)}
+                  placeholder="e.g. Red Cross Charity"
+                  required
+                  className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
+                />
+              </div>
+              <div>
+                <label className="block mb-1 text-zinc-500 font-bold uppercase">Limit Type</label>
+                <select
+                  value={recType}
+                  onChange={(e) => setRecType(e.target.value as any)}
+                  required
+                  className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 font-semibold focus:outline-none focus:border-zinc-400"
+                >
+                  <option value="monthly">Monthly Limit</option>
+                  <option value="onetime">One-Time Limit</option>
+                  <option value="open">Open (No Limit)</option>
+                </select>
+              </div>
+              {recType !== "open" && (
+                <div>
+                  <label className="block mb-1 text-zinc-500 font-bold uppercase">Limit (in Cartons)</label>
+                  <input 
+                    type="number" 
+                    value={recLimit}
+                    onChange={(e) => setRecLimit(e.target.value)}
+                    placeholder="Maximum cartons allowed"
+                    required
+                    min={1}
+                    className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
+                  />
+                  <p className="text-[10px] text-zinc-400 font-medium mt-1">
+                    Transactions are logged in pieces, but limits are tracked in cartons.
+                  </p>
+                </div>
+              )}
+              <CustomButton 
+                type="submit"
+                variant="dark"
+                className="w-full mt-2 h-10"
+              >
+                Register Entity
+              </CustomButton>
+            </form>
+          </div>
+
+          {/* Table col */}
+          <div className="lg:col-span-2 bg-white border border-zinc-300/40 rounded-xl shadow-sm overflow-hidden flex flex-col">
+            <div className="px-5 py-3.5 bg-zinc-50 border-b border-zinc-200">
+              <h4 className="font-bold text-zinc-800 text-sm">Receiver Registry and Statuses</h4>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-zinc-50 border-b border-zinc-200 text-zinc-500 font-bold uppercase tracking-wider">
+                    <th className="px-6 py-3">Entity Name</th>
+                    <th className="px-6 py-3">Limit Type</th>
+                    <th className="px-6 py-3 text-right">Limit (Ctns)</th>
+                    <th className="px-6 py-3 text-right">Given (Ctns)</th>
+                    <th className="px-6 py-3 text-right">Balance (Ctns)</th>
+                    <th className="px-6 py-3 text-center">Status</th>
+                    <th className="px-6 py-3 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-200 text-zinc-700">
+                  {receivers.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="text-center p-8 italic text-zinc-400">
+                        No receivers registered yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    receivers.map((rec) => {
+                      const given = calculateGivenCartons(rec.id, rec.type);
+                      const isLimited = rec.type !== "open";
+                      const balance = isLimited ? (rec.limit! - given) : null;
+                      
+                      let statusBadge = "";
+                      if (isLimited) {
+                        if (balance! <= 0) {
+                          statusBadge = "bg-red-100 text-red-800 border-red-200";
+                        } else if (balance! <= (rec.limit! * 0.2)) {
+                          statusBadge = "bg-amber-100 text-amber-800 border-amber-200";
+                        } else {
+                          statusBadge = "bg-green-100 text-green-800 border-green-200";
+                        }
+                      } else {
+                        statusBadge = "bg-blue-100 text-blue-800 border-blue-200";
+                      }
+
+                      return (
+                        <tr key={rec.id} className="hover:bg-zinc-50/50">
+                          <td className="px-6 py-4 font-bold text-zinc-900">{rec.name}</td>
+                          <td className="px-6 py-4 uppercase font-semibold text-zinc-400 text-[10px] tracking-wider">
+                            {rec.type === "monthly" ? "Monthly" : rec.type === "onetime" ? "One-Time" : "Open"}
+                          </td>
+                          <td className="px-6 py-4 text-right font-bold">{isLimited ? rec.limit : "∞"}</td>
+                          <td className="px-6 py-4 text-right font-bold">{given.toFixed(1)}</td>
+                          <td className="px-6 py-4 text-right font-bold">{isLimited ? balance!.toFixed(1) : "∞"}</td>
+                          <td className="px-6 py-4 text-center">
+                            <span className={`px-2 py-0.5 text-[10px] font-bold rounded-md border ${statusBadge}`}>
+                              {isLimited ? (balance! <= 0 ? "Limit Reached" : balance! <= (rec.limit! * 0.2) ? "Near Limit" : "Active") : "Open"}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-center flex justify-center">
+                            <Trash2 
+                              size={14} 
+                              onClick={() => handleDeleteReceiver(rec.id)}
+                              className="text-zinc-400 hover:text-red-600 cursor-pointer transition-colors"
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- CLAIM PRINT POPUP MODAL --- */}
+      {isPrintModalOpen && (
+        <div className="fixed inset-0 bg-zinc-950/60 flex items-center justify-center z-50 p-4 animate-tableFadeInOnly">
+          <div className="bg-white border border-zinc-200 w-full max-w-sm rounded-xl p-5 shadow-2xl flex flex-col gap-4 animate-modalSlideUp">
+            <div>
+              <h3 className="font-bold text-zinc-950 text-sm">Generate Claim Report</h3>
+              <p className="text-[11px] text-zinc-400 mt-0.5">Create a printable statement statement for the brand owner.</p>
+            </div>
+            <div>
+              <label className="block mb-1 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Select Brand Owner</label>
+              <select
+                value={printBrandName}
+                onChange={(e) => setPrintBrandName(e.target.value)}
+                className="w-full text-xs bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 font-bold focus:outline-none"
+              >
+                <option value="">Select Brand</option>
+                {uniqueCatalogBrands.map(name => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block mb-1 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Start Date</label>
+                <input
+                  type="date"
+                  value={printStartDate}
+                  onChange={(e) => setPrintStartDate(e.target.value)}
+                  className="w-full text-xs bg-zinc-50 border border-zinc-300 rounded-lg p-2 text-zinc-900 font-bold focus:outline-none focus:border-zinc-400"
+                />
+              </div>
+              <div>
+                <label className="block mb-1 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">End Date</label>
+                <input
+                  type="date"
+                  value={printEndDate}
+                  onChange={(e) => setPrintEndDate(e.target.value)}
+                  className="w-full text-xs bg-zinc-50 border border-zinc-300 rounded-lg p-2 text-zinc-900 font-bold focus:outline-none focus:border-zinc-400"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-2 border-t border-zinc-100 justify-end">
+              <CustomButton 
+                onClick={() => {
+                  setIsPrintModalOpen(false);
+                  setPrintBrandName("");
+                  setPrintStartDate("");
+                  setPrintEndDate("");
+                }}
+                variant="default"
+                className="h-10"
+              >
+                Cancel
+              </CustomButton>
+              <CustomButton 
+                onClick={handlePrintClaim}
+                disabled={!printBrandName}
+                variant="dark"
+                className="h-10"
+              >
+                Print Report
+              </CustomButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}

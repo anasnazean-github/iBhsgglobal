@@ -7,6 +7,7 @@ import { SalesLeaderboardModule } from "../modules/SalesLeaderboardModule";
 import { PromoPricingRulesModule } from "../modules/PromoPricingRulesModule";
 import { SnapDealsModule } from "../modules/SnapDealsModule";
 import { StoresVisibilityModule } from "../modules/StoresVisibilityModule";
+import { SponsorshipModule } from "../modules/SponsorshipModule";
 import { APP_PAGES_CONFIG } from "@/config/modules-config";
 
 interface SalesChannelsPageProps {
@@ -69,6 +70,8 @@ export function SalesChannelsPage({ profile }: SalesChannelsPageProps) {
         return <SnapDealsModule profile={profile} />;
       case "Stores Visibility":
         return <StoresVisibilityModule profile={profile} />;
+      case "Sponsorship":
+        return <SponsorshipModule profile={profile} />;
       default:
         return null;
     }

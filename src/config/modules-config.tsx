@@ -78,6 +78,10 @@ export const APP_PAGES_CONFIG: PageConfig[] = [
       {
         title: "Stores Visibility",
         description: "Monitor product retail presence, store visibility, latest visits, and shelf compliance audits.",
+      },
+      {
+        title: "Sponsorship",
+        description: "Manage brand sponsorships, output distribution tracking, and receiver limit registries.",
       }
     ]
   },

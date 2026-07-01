@@ -3,7 +3,7 @@
 import * as React from "react";
 
 interface CustomButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "default" | "secondary" | "danger" | "dark";
+  variant?: "default" | "secondary" | "danger" | "dark" | "ghost";
   children: React.ReactNode;
 }
 
@@ -24,6 +24,9 @@ export function CustomButton({ variant = "default", children, className = "", ..
   } else if (variant === "danger") {
     // Rose border/warning button
     variantStyle = "bg-[#EEEEEE] border-zinc-300 text-red-600 hover:text-red-700 hover:bg-red-50";
+  } else if (variant === "ghost") {
+    // Transparent background, borderless, shadowless button
+    variantStyle = "bg-transparent border-transparent text-zinc-700 hover:text-zinc-950 hover:bg-zinc-100 shadow-none";
   }
 
   return (
