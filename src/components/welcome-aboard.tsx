@@ -119,6 +119,24 @@ export function WelcomeAboardScreen({ profile, idToken, onLogout, onComplete }: 
 
   return (
     <div className="flex min-h-screen w-full flex-col items-center justify-center bg-[#EEEEEE] p-6 font-primary animate-fade-in">
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 8px;
+          display: block;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: #f1f5f9;
+          border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 4px;
+          border: 2px solid #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #94a3b8;
+        }
+      `}</style>
       <div className="w-full max-w-lg bg-[#E5E5E5] border border-zinc-300 rounded-lg p-8 shadow-md flex flex-col gap-6">
         <div className="flex flex-col gap-1 text-center">
           <div className="mx-auto h-10 w-10 rounded-lg bg-zinc-700 text-white flex items-center justify-center shadow-xs">
@@ -206,7 +224,7 @@ export function WelcomeAboardScreen({ profile, idToken, onLogout, onComplete }: 
             {/* Scrollable text container */}
             <div 
               onScroll={handleScroll}
-              className="flex-1 min-h-0 p-6 overflow-y-auto bg-zinc-50 text-zinc-700 text-xs leading-relaxed border-b border-zinc-300 whitespace-pre-wrap font-primary select-text"
+              className="flex-1 min-h-0 p-6 overflow-y-scroll custom-scrollbar bg-zinc-50 text-zinc-700 text-xs leading-relaxed border-b border-zinc-300 whitespace-pre-wrap font-primary select-text"
             >
               {contractText}
             </div>
