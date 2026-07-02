@@ -25,6 +25,7 @@ interface SponsorshipModuleProps {
 
 interface SkuLink {
   id: string;
+  sponsoredBy: string;
   brandName: string;
   sku: string;
   productName: string;
@@ -171,12 +172,16 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
   const [txQty, setTxQty] = React.useState<string>("");
   const [txRemark, setTxRemark] = React.useState<string>("");
   const [txItems, setTxItems] = React.useState<Array<{ skuId: string; qtyPcs: number }>>([]);
+  const [txSponsoredBy, setTxSponsoredBy] = React.useState<string>("");
 
   // Sponsored form states
+  const [sponsoredBy, setSponsoredBy] = React.useState<string>("");
   const [selectedBrand, setSelectedBrand] = React.useState<string>("");
   const [selectedProductSku, setSelectedProductSku] = React.useState<string>("");
+  const [sponsoredCatalogId, setSponsoredCatalogId] = React.useState<string | null>(null);
 
   // Receiver form states
+  const [recId, setRecId] = React.useState<string | null>(null);
   const [recName, setRecName] = React.useState<string>("");
   const [recType, setRecType] = React.useState<"monthly" | "onetime" | "open">("monthly");
   const [recLimit, setRecLimit] = React.useState<string>("");
@@ -186,7 +191,9 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
 
   // Claim statement print modal states
   const [isPrintModalOpen, setIsPrintModalOpen] = React.useState<boolean>(false);
+  const [printFilterType, setPrintFilterType] = React.useState<"brand" | "sponsor">("brand");
   const [printBrandName, setPrintBrandName] = React.useState<string>("");
+  const [printSponsorName, setPrintSponsorName] = React.useState<string>("");
   const [printStartDate, setPrintStartDate] = React.useState<string>("");
   const [printEndDate, setPrintEndDate] = React.useState<string>("");
 
@@ -211,6 +218,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
         const items = JSON.parse(cachedCatalog);
         setCatalog(items.map((item: any) => ({
           id: item.ID || item.id,
+          sponsoredBy: item["Sponsored By"] || item.sponsoredBy || "",
           brandName: item["Brand Name"] || item.brandName,
           sku: item.SKU || item.sku,
           productName: item["Product Name"] || item.productName,
@@ -303,6 +311,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
       
       const newCatalog = catalogData.map((item: any) => ({
         id: item.ID,
+        sponsoredBy: item["Sponsored By"] || "",
         brandName: item["Brand Name"],
         sku: item.SKU,
         productName: item["Product Name"],
@@ -382,14 +391,34 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
     return productsList.filter(p => String(p["Brands ID"]) === targetBrandId || p["Brand Name"] === selectedBrand);
   }, [selectedBrand, productsList, brandsList]);
 
+  const handleEditCatalog = (item: SkuLink) => {
+    if (userRole === "viewer") {
+      showToast("Access Denied: Viewers cannot edit the catalog.", "error");
+      return;
+    }
+    setSponsoredCatalogId(item.id);
+    setSponsoredBy(item.sponsoredBy || "");
+    const brand = brandsList.find(b => b["Display Name"] === item.brandName);
+    setSelectedBrand(brand ? String(brand.ID) : item.brandName);
+    setSelectedProductSku(item.sku);
+    showToast("Editing sponsored product entry...", "info");
+  };
+
+  const handleCancelCatalogEdit = () => {
+    setSponsoredCatalogId(null);
+    setSponsoredBy("");
+    setSelectedBrand("");
+    setSelectedProductSku("");
+  };
+
   const handleAddCatalog = (e: React.FormEvent) => {
     e.preventDefault();
     if (userRole === "viewer") {
       showToast("Access Denied: Viewers cannot modify the catalog.", "error");
       return;
     }
-    if (!selectedBrand || !selectedProductSku) {
-      showToast("Please select a brand owner and sponsored product SKU.", "error");
+    if (!sponsoredBy.trim() || !selectedBrand || !selectedProductSku) {
+      showToast("Please enter Sponsor, select a brand owner and sponsored product SKU.", "error");
       return;
     }
 
@@ -405,15 +434,24 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
     const uom = parseInt(product.Carton) || 24;
     const cost = parseFloat(product.Cost) || 0;
 
-    const exists = catalog.some(c => c.sku === selectedProductSku && c.brandName === brandName);
+    const isEdit = !!sponsoredCatalogId;
+
+    const exists = catalog.some(c => 
+      c.id !== sponsoredCatalogId && 
+      c.sku === selectedProductSku && 
+      c.sponsoredBy.trim().toLowerCase() === sponsoredBy.trim().toLowerCase()
+    );
     if (exists) {
-      showToast("This Brand SKU sponsorship is already in the catalog.", "error");
+      showToast("This Brand SKU sponsorship is already in the catalog under this sponsor.", "error");
       return;
     }
 
-    const newId = "link_" + Date.now();
+    const targetId = isEdit ? sponsoredCatalogId : "link_" + Date.now();
+    const action = isEdit ? "update" : "insert";
+
     const newLinkData = {
-      ID: newId,
+      ID: targetId,
+      "Sponsored By": sponsoredBy.trim(),
       "Brand Name": brandName,
       SKU: selectedProductSku,
       "Product Name": product["Display Name"] || "N/A",
@@ -422,28 +460,47 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
     };
 
     // --- INSTANT FRONTEND UPDATE ---
-    const updated = [...catalog, {
-      id: newId,
-      brandName,
-      sku: selectedProductSku,
-      productName: newLinkData["Product Name"],
-      uom,
-      cost
-    }];
+    let updated = [...catalog];
+    if (isEdit) {
+      updated = updated.map(c => c.id === targetId ? {
+        id: targetId,
+        sponsoredBy: sponsoredBy.trim(),
+        brandName,
+        sku: selectedProductSku,
+        productName: newLinkData["Product Name"],
+        uom,
+        cost
+      } : c);
+    } else {
+      updated.push({
+        id: targetId,
+        sponsoredBy: sponsoredBy.trim(),
+        brandName,
+        sku: selectedProductSku,
+        productName: newLinkData["Product Name"],
+        uom,
+        cost
+      });
+    }
+
     setCatalog(updated);
     localStorage.setItem("sponsorship_catalog_data", JSON.stringify(updated.map(c => ({
       ID: c.id,
+      "Sponsored By": c.sponsoredBy,
       "Brand Name": c.brandName,
       SKU: c.sku,
       "Product Name": c.productName,
       UOM: c.uom,
       Cost: c.cost
     }))));
+    
+    setSponsoredCatalogId(null);
+    setSponsoredBy("");
     setSelectedProductSku("");
-    showToast("Product added to catalog.", "success");
+    showToast(isEdit ? "Sponsorship updated." : "Product added to catalog.", "success");
 
     // --- SILENT BACKGROUND SAVE ---
-    writeToDatabase("sponsorship_catalog", "insert", newLinkData)
+    writeToDatabase("sponsorship_catalog", action, newLinkData)
       .catch((err) => {
         showToast("Background sync failed for catalog item: " + err.message, "warning");
       });
@@ -465,6 +522,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
     setCatalog(updated);
     localStorage.setItem("sponsorship_catalog_data", JSON.stringify(updated.map(c => ({
       ID: c.id,
+      "Sponsored By": c.sponsoredBy,
       "Brand Name": c.brandName,
       SKU: c.sku,
       "Product Name": c.productName,
@@ -502,6 +560,25 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
     }, 0);
   };
 
+  const handleEditReceiver = (rec: Receiver) => {
+    if (userRole === "viewer") {
+      showToast("Access Denied: Viewers cannot edit receivers.", "error");
+      return;
+    }
+    setRecId(rec.id);
+    setRecName(rec.name);
+    setRecType(rec.type);
+    setRecLimit(rec.limit !== null ? String(rec.limit) : "");
+    showToast("Editing receiver entity...", "info");
+  };
+
+  const handleCancelReceiverEdit = () => {
+    setRecId(null);
+    setRecName("");
+    setRecType("monthly");
+    setRecLimit("");
+  };
+
   const handleAddReceiver = (e: React.FormEvent) => {
     e.preventDefault();
     if (userRole === "viewer") {
@@ -522,21 +599,35 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
       }
     }
 
-    const newId = "rec_" + Date.now();
+    const isEdit = !!recId;
+    const targetId = isEdit ? recId : "rec_" + Date.now();
+    const action = isEdit ? "update" : "insert";
+
     const newRecData = {
-      ID: newId,
+      ID: targetId,
       Name: recName.trim(),
       Type: recType,
       Limit: limit !== null ? limit : ""
     };
 
     // --- INSTANT FRONTEND UPDATE ---
-    const updated = [...receivers, {
-      id: newId,
-      name: newRecData.Name,
-      type: recType,
-      limit
-    }];
+    let updated = [...receivers];
+    if (isEdit) {
+      updated = updated.map(r => r.id === targetId ? {
+        id: targetId,
+        name: newRecData.Name,
+        type: recType,
+        limit
+      } : r);
+    } else {
+      updated.push({
+        id: targetId,
+        name: newRecData.Name,
+        type: recType,
+        limit
+      });
+    }
+
     setReceivers(updated);
     localStorage.setItem("sponsorship_receivers_data", JSON.stringify(updated.map(r => ({
       ID: r.id,
@@ -544,12 +635,14 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
       Type: r.type,
       Limit: r.limit !== null ? r.limit : ""
     }))));
+
+    setRecId(null);
     setRecName("");
     setRecLimit("");
-    showToast("Receiver registered.", "success");
+    showToast(isEdit ? "Receiver updated." : "Receiver registered.", "success");
 
     // --- SILENT BACKGROUND SAVE ---
-    writeToDatabase("sponsorship_receivers", "insert", newRecData)
+    writeToDatabase("sponsorship_receivers", action, newRecData)
       .catch((err) => {
         showToast("Background sync failed for receiver: " + err.message, "warning");
       });
@@ -775,6 +868,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
     setTxSkuId("");
     setTxReceiverId("");
     setTxItems([]);
+    setTxSponsoredBy("");
 
     showToast(isEdit ? "Transaction updated." : "Transaction logged.", "success");
   };
@@ -794,6 +888,10 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
     setTxRemark(tx.remark);
     
     setTxItems([{ skuId: tx.skuId, qtyPcs: tx.qtyPcs }]);
+    const link = catalog.find(c => c.id === tx.skuId);
+    if (link) {
+      setTxSponsoredBy(link.sponsoredBy || "");
+    }
     
     showToast("Editing transaction entry...", "info");
   };
@@ -833,6 +931,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
     setTxReceiverId("");
     setTxDate(epochToInputVal(Date.now()));
     setTxItems([]);
+    setTxSponsoredBy("");
   };
 
   // --- DASHBOARD MATHS ---
@@ -856,29 +955,35 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
       }
     });
 
-    const summaryMap: Record<string, Record<string, { ctns: number; cost: number; skuCode: string }>> = {};
+    const summaryMap: Record<string, Record<string, { sponsoredBy: string; ctns: number; cost: number; skuCode: string }>> = {};
     filtered.forEach(t => {
       const link = catalog.find(c => c.id === t.skuId);
       if (link) {
-        if (!summaryMap[link.brandName]) summaryMap[link.brandName] = {};
-        if (!summaryMap[link.brandName][link.productName]) {
-          summaryMap[link.brandName][link.productName] = { ctns: 0, cost: 0, skuCode: link.sku };
+        const sponsor = link.sponsoredBy || "-";
+        const key = `${sponsor}_${link.brandName}`;
+        if (!summaryMap[key]) summaryMap[key] = {};
+        if (!summaryMap[key][link.productName]) {
+          summaryMap[key][link.productName] = { sponsoredBy: sponsor, ctns: 0, cost: 0, skuCode: link.sku };
         }
         const ctns = t.qtyPcs / link.uom;
-        summaryMap[link.brandName][link.productName].ctns += ctns;
-        summaryMap[link.brandName][link.productName].cost += (t.qtyPcs * link.cost);
+        summaryMap[key][link.productName].ctns += ctns;
+        summaryMap[key][link.productName].cost += (t.qtyPcs * link.cost);
       }
     });
 
-    const summaryList: Array<{ brand: string; skuName: string; skuCode: string; ctns: number; cost: number }> = [];
-    for (const brand in summaryMap) {
-      for (const skuName in summaryMap[brand]) {
+    const summaryList: Array<{ sponsoredBy: string; brand: string; skuName: string; skuCode: string; ctns: number; cost: number }> = [];
+    for (const key in summaryMap) {
+      const separatorIdx = key.indexOf("_");
+      const sponsoredBy = key.substring(0, separatorIdx);
+      const brand = key.substring(separatorIdx + 1);
+      for (const skuName in summaryMap[key]) {
         summaryList.push({
+          sponsoredBy,
           brand,
           skuName,
-          skuCode: summaryMap[brand][skuName].skuCode,
-          ctns: summaryMap[brand][skuName].ctns,
-          cost: summaryMap[brand][skuName].cost
+          skuCode: summaryMap[key][skuName].skuCode,
+          ctns: summaryMap[key][skuName].ctns,
+          cost: summaryMap[key][skuName].cost
         });
       }
     }
@@ -891,9 +996,9 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
     };
   }, [dashFilter, transactions, catalog]);
 
-  // --- PRINTING / REPORT GENERATION ---
   const handlePrintClaim = () => {
-    if (!printBrandName) return;
+    const filterValue = printFilterType === "brand" ? printBrandName : printSponsorName;
+    if (!filterValue) return;
 
     let startEpoch = 0;
     let endEpoch = Infinity;
@@ -907,14 +1012,19 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
 
     const relevantTx = transactions.filter(t => {
       const link = catalog.find(c => c.id === t.skuId);
-      if (!link || link.brandName !== printBrandName) return false;
+      if (!link) return false;
+      if (printFilterType === "brand") {
+        if (link.brandName !== printBrandName) return false;
+      } else {
+        if (link.sponsoredBy !== printSponsorName) return false;
+      }
       if (t.date < startEpoch) return false;
       if (t.date > endEpoch) return false;
       return true;
     });
 
     if (relevantTx.length === 0) {
-      showToast(`No logged distributions found for ${printBrandName} in the selected period.`, "warning");
+      showToast(`No logged distributions found for ${filterValue} in the selected period.`, "warning");
       return;
     }
 
@@ -1036,7 +1146,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
     const printHtml = `
       <html>
         <head>
-          <title>Claim Statement - ${printBrandName}</title>
+          <title>Claim Statement - ${filterValue}</title>
           <style>
             body { font-family: 'Inter', sans-serif; color: #1e293b; padding: 40px; margin: 0; }
             table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 25px; }
@@ -1058,7 +1168,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
               <p style="margin: 4px 0 0 0; font-size: 14px; color: #64748b;">HSG Global Pte Ltd</p>
             </div>
             <div style="text-align: right;">
-              <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #3b82f6;">${printBrandName}</h3>
+              <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #3b82f6;">${filterValue}</h3>
               <p class="subtext">Period: ${periodText}</p>
               <p class="subtext">Print Date: ${new Date().toLocaleDateString("en-GB")}</p>
             </div>
@@ -1134,14 +1244,28 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
     return Array.from(new Set(catalog.map(c => c.brandName)));
   }, [catalog]);
 
+  const uniqueCatalogSponsors = React.useMemo(() => {
+    return Array.from(new Set(catalog.map(c => c.sponsoredBy).filter(Boolean)));
+  }, [catalog]);
+
   // --- MEMOIZED SEARCHABLE SELECT DATA SOURCES ---
   const receiverOptions = React.useMemo(() => {
     return receivers.map(r => ({ value: r.id, label: `${r.name} (${r.type})` }));
   }, [receivers]);
 
+  const filteredCatalog = React.useMemo(() => {
+    if (!txSponsoredBy) return catalog;
+    return catalog.filter(c => c.sponsoredBy === txSponsoredBy);
+  }, [catalog, txSponsoredBy]);
+
   const catalogOptions = React.useMemo(() => {
-    return catalog.map(c => ({ value: c.id, label: `[${c.brandName}] ${c.sku} - ${c.productName}` }));
-  }, [catalog]);
+    return filteredCatalog.map(c => ({
+      value: c.id,
+      label: c.sponsoredBy
+        ? `[${c.sponsoredBy} - ${c.brandName}] ${c.sku} - ${c.productName}`
+        : `[${c.brandName}] ${c.sku} - ${c.productName}`
+    }));
+  }, [filteredCatalog]);
 
   const brandOptions = React.useMemo(() => {
     return brandsList.map(b => ({ value: String(b.ID), label: b["Display Name"] }));
@@ -1253,6 +1377,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-zinc-50 border-b border-zinc-200 text-zinc-500 font-bold uppercase tracking-wider">
+                    <th className="px-6 py-3">Sponsored By</th>
                     <th className="px-6 py-3">Brand Name</th>
                     <th className="px-6 py-3">SKU</th>
                     <th className="px-6 py-3">Product Name</th>
@@ -1263,13 +1388,14 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                 <tbody className="divide-y divide-zinc-200 text-zinc-700">
                   {dashboardStats.summaryList.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="text-center p-8 italic text-zinc-400">
+                      <td colSpan={6} className="text-center p-8 italic text-zinc-400">
                         No distribution logs found for the filtered period.
                       </td>
                     </tr>
                   ) : (
                     dashboardStats.summaryList.map((item, idx) => (
                       <tr key={idx} className="hover:bg-zinc-50/50">
+                        <td className="px-6 py-4 font-bold text-zinc-900">{item.sponsoredBy || "-"}</td>
                         <td className="px-6 py-4 font-bold text-zinc-900">{item.brand}</td>
                         <td className="px-6 py-4 font-mono">{item.skuCode}</td>
                         <td className="px-6 py-4">{item.skuName}</td>
@@ -1338,6 +1464,23 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
               {/* SKU Items List section */}
               <div className="border border-zinc-200 rounded-lg p-3 bg-zinc-50/50 mt-1 flex flex-col gap-3">
                 <span className="font-bold text-[10px] text-zinc-400 uppercase tracking-wider block">Add SKUs to Transaction</span>
+                <div>
+                  <label className="block mb-1 text-[10px] text-zinc-500 font-semibold uppercase">Filter by Sponsor</label>
+                  <select
+                    value={txSponsoredBy}
+                    onChange={(e) => {
+                      setTxSponsoredBy(e.target.value);
+                      setTxSkuId("");
+                    }}
+                    disabled={userRole === "viewer"}
+                    className="w-full text-xs bg-white border border-zinc-300 rounded-lg p-2 text-zinc-900 font-semibold focus:outline-none focus:border-zinc-400 h-8"
+                  >
+                    <option value="">All Sponsors</option>
+                    {uniqueCatalogSponsors.map(sponsor => (
+                      <option key={sponsor} value={sponsor}>{sponsor}</option>
+                    ))}
+                  </select>
+                </div>
                 <div className="flex gap-2 items-end">
                   <div className="flex-1">
                     <label className="block mb-1 text-[10px] text-zinc-500 font-semibold uppercase">Sku</label>
@@ -1510,9 +1653,21 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
           {/* Form col */}
           <div className="bg-white border border-zinc-300/40 p-5 rounded-xl shadow-sm h-fit">
             <h3 className="font-bold text-zinc-900 border-b pb-2 text-sm uppercase tracking-wider">
-              Add Sponsored Product
+              {sponsoredCatalogId ? "Edit Sponsored Product" : "Add Sponsored Product"}
             </h3>
             <form onSubmit={handleAddCatalog} className="flex flex-col gap-4 mt-4 text-xs">
+              <div>
+                <label className="block mb-1 text-zinc-500 font-bold uppercase">Sponsored By</label>
+                <input 
+                  type="text" 
+                  value={sponsoredBy}
+                  onChange={(e) => setSponsoredBy(e.target.value)}
+                  placeholder="e.g. HSG Global"
+                  required
+                  disabled={userRole === "viewer"}
+                  className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
+                />
+              </div>
               <div>
                 <label className="block mb-1 text-zinc-500 font-bold uppercase">Brand Owner</label>
                 <SearchableSelect
@@ -1558,17 +1713,29 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                   </div>
                 </div>
               )}
-              <CustomButton 
-                type="submit"
-                disabled={userRole === "viewer"}
-                variant="dark"
-                className="w-full mt-2 h-10"
-              >
-                {userRole === "viewer" ? "View Only" : "Add to Catalog"}
-              </CustomButton>
+              <div className="flex gap-2 mt-2">
+                <CustomButton 
+                  type="submit"
+                  disabled={userRole === "viewer"}
+                  variant={sponsoredCatalogId ? "secondary" : "dark"}
+                  className="flex-1 h-10"
+                >
+                  {userRole === "viewer" ? "View Only" : sponsoredCatalogId ? "Update Catalog" : "Add to Catalog"}
+                </CustomButton>
+                {sponsoredCatalogId && (
+                  <CustomButton 
+                    type="button" 
+                    onClick={handleCancelCatalogEdit}
+                    variant="default"
+                    className="h-10"
+                  >
+                    Cancel
+                  </CustomButton>
+                )}
+              </div>
             </form>
           </div>
-
+ 
           {/* Table col */}
           <div className="lg:col-span-2 bg-white border border-zinc-300/40 rounded-xl shadow-sm overflow-hidden flex flex-col">
             <div className="px-5 py-3.5 bg-zinc-50 border-b border-zinc-200">
@@ -1578,6 +1745,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-zinc-50 border-b border-zinc-200 text-zinc-500 font-bold uppercase tracking-wider">
+                    <th className="px-6 py-3">Sponsored By</th>
                     <th className="px-6 py-3">Brand Owner</th>
                     <th className="px-6 py-3">SKU</th>
                     <th className="px-6 py-3">Product Name</th>
@@ -1590,20 +1758,28 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                 <tbody className="divide-y divide-zinc-200 text-zinc-700">
                   {catalog.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center p-8 italic text-zinc-400">
+                      <td colSpan={8} className="text-center p-8 italic text-zinc-400">
                         No product sponsorships linked yet.
                       </td>
                     </tr>
                   ) : (
                     catalog.map((item) => (
                       <tr key={item.id} className="hover:bg-zinc-50/50">
+                        <td className="px-6 py-4 font-bold text-zinc-900">{item.sponsoredBy || "-"}</td>
                         <td className="px-6 py-4 font-bold text-zinc-900">{item.brandName}</td>
                         <td className="px-6 py-4 font-mono">{item.sku}</td>
                         <td className="px-6 py-4">{item.productName}</td>
                         <td className="px-6 py-4 text-center font-bold">{item.uom}</td>
                         <td className="px-6 py-4 text-right font-bold text-zinc-900">${item.cost.toFixed(2)}</td>
                         <td className="px-6 py-4 text-right font-bold text-zinc-900">${(item.cost * item.uom).toFixed(2)}</td>
-                        <td className="px-6 py-4 text-center flex justify-center">
+                        <td className="px-6 py-4 text-center flex justify-center gap-2">
+                          {userRole !== "viewer" && (
+                            <Pencil 
+                              size={14} 
+                              onClick={() => handleEditCatalog(item)}
+                              className="text-zinc-400 hover:text-blue-600 cursor-pointer transition-colors"
+                            />
+                          )}
                           {userRole === "admin" && (
                             <Trash2 
                               size={14} 
@@ -1628,7 +1804,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
           {/* Form col */}
           <div className="bg-white border border-zinc-300/40 p-5 rounded-xl shadow-sm h-fit">
             <h3 className="font-bold text-zinc-900 border-b pb-2 text-sm uppercase tracking-wider">
-              Register Entity
+              {recId ? "Edit Entity" : "Register Entity"}
             </h3>
             <form onSubmit={handleAddReceiver} className="flex flex-col gap-4 mt-4 text-xs">
               <div>
@@ -1675,14 +1851,26 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                   </p>
                 </div>
               )}
-              <CustomButton 
-                type="submit"
-                disabled={userRole === "viewer"}
-                variant="dark"
-                className="w-full mt-2 h-10"
-              >
-                {userRole === "viewer" ? "View Only" : "Register Entity"}
-              </CustomButton>
+              <div className="flex gap-2 mt-2">
+                <CustomButton 
+                  type="submit"
+                  disabled={userRole === "viewer"}
+                  variant={recId ? "secondary" : "dark"}
+                  className="flex-1 h-10"
+                >
+                  {userRole === "viewer" ? "View Only" : recId ? "Update Entity" : "Register Entity"}
+                </CustomButton>
+                {recId && (
+                  <CustomButton 
+                    type="button" 
+                    onClick={handleCancelReceiverEdit}
+                    variant="default"
+                    className="h-10"
+                  >
+                    Cancel
+                  </CustomButton>
+                )}
+              </div>
             </form>
           </div>
 
@@ -1744,7 +1932,14 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                               {isLimited ? (balance! <= 0 ? "Limit Reached" : balance! <= (rec.limit! * 0.2) ? "Near Limit" : "Active") : "Open"}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-center flex justify-center">
+                          <td className="px-6 py-4 text-center flex justify-center gap-2">
+                            {userRole !== "viewer" && (
+                              <Pencil 
+                                size={14} 
+                                onClick={() => handleEditReceiver(rec)}
+                                className="text-zinc-400 hover:text-blue-600 cursor-pointer transition-colors"
+                              />
+                            )}
                             {userRole === "admin" && (
                               <Trash2 
                                 size={14} 
@@ -1770,21 +1965,70 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
           <div className="bg-white border border-zinc-200 w-full max-w-sm rounded-xl p-5 shadow-2xl flex flex-col gap-4 animate-modalSlideUp">
             <div>
               <h3 className="font-bold text-zinc-950 text-sm">Generate Claim Report</h3>
-              <p className="text-[11px] text-zinc-400 mt-0.5">Create a printable statement statement for the brand owner.</p>
+              <p className="text-[11px] text-zinc-400 mt-0.5">Create a printable statement for the brand owner or sponsoring entity.</p>
             </div>
             <div>
-              <label className="block mb-1 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Select Brand Owner</label>
-              <select
-                value={printBrandName}
-                onChange={(e) => setPrintBrandName(e.target.value)}
-                className="w-full text-xs bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 font-bold focus:outline-none"
-              >
-                <option value="">Select Brand</option>
-                {uniqueCatalogBrands.map(name => (
-                  <option key={name} value={name}>{name}</option>
-                ))}
-              </select>
+              <label className="block mb-1 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Report Filter Type</label>
+              <div className="flex gap-4 mb-2">
+                <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-zinc-700">
+                  <input
+                    type="radio"
+                    name="printFilterType"
+                    value="brand"
+                    checked={printFilterType === "brand"}
+                    onChange={() => {
+                      setPrintFilterType("brand");
+                      setPrintSponsorName("");
+                    }}
+                    className="accent-zinc-900"
+                  />
+                  Brand Owner
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-zinc-700">
+                  <input
+                    type="radio"
+                    name="printFilterType"
+                    value="sponsor"
+                    checked={printFilterType === "sponsor"}
+                    onChange={() => {
+                      setPrintFilterType("sponsor");
+                      setPrintBrandName("");
+                    }}
+                    className="accent-zinc-900"
+                  />
+                  Sponsor
+                </label>
+              </div>
             </div>
+            {printFilterType === "brand" ? (
+              <div>
+                <label className="block mb-1 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Select Brand Owner</label>
+                <select
+                  value={printBrandName}
+                  onChange={(e) => setPrintBrandName(e.target.value)}
+                  className="w-full text-xs bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 font-bold focus:outline-none"
+                >
+                  <option value="">Select Brand</option>
+                  {uniqueCatalogBrands.map(name => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div>
+                <label className="block mb-1 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Select Sponsor</label>
+                <select
+                  value={printSponsorName}
+                  onChange={(e) => setPrintSponsorName(e.target.value)}
+                  className="w-full text-xs bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 font-bold focus:outline-none"
+                >
+                  <option value="">Select Sponsor</option>
+                  {uniqueCatalogSponsors.map(name => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block mb-1 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Start Date</label>
@@ -1810,6 +2054,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                 onClick={() => {
                   setIsPrintModalOpen(false);
                   setPrintBrandName("");
+                  setPrintSponsorName("");
                   setPrintStartDate("");
                   setPrintEndDate("");
                 }}
@@ -1820,7 +2065,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
               </CustomButton>
               <CustomButton 
                 onClick={handlePrintClaim}
-                disabled={!printBrandName}
+                disabled={printFilterType === "brand" ? !printBrandName : !printSponsorName}
                 variant="dark"
                 className="h-10"
               >

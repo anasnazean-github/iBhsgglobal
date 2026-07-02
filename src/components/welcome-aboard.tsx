@@ -60,7 +60,7 @@ export function WelcomeAboardScreen({ profile, idToken, onLogout, onComplete }: 
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
-    const isAtBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 8;
+    const isAtBottom = target.scrollHeight - target.scrollTop - target.clientHeight <= 15;
     if (isAtBottom) {
       setScrolledToBottom(true);
     }
@@ -118,7 +118,7 @@ export function WelcomeAboardScreen({ profile, idToken, onLogout, onComplete }: 
   };
 
   return (
-    <div className="flex min-h-screen w-full flex-col items-center justify-center bg-[#EEEEEE] p-6 select-none font-primary animate-fade-in">
+    <div className="flex min-h-screen w-full flex-col items-center justify-center bg-[#EEEEEE] p-6 font-primary animate-fade-in">
       <div className="w-full max-w-lg bg-[#E5E5E5] border border-zinc-300 rounded-lg p-8 shadow-md flex flex-col gap-6">
         <div className="flex flex-col gap-1 text-center">
           <div className="mx-auto h-10 w-10 rounded-lg bg-zinc-700 text-white flex items-center justify-center shadow-xs">
@@ -206,7 +206,7 @@ export function WelcomeAboardScreen({ profile, idToken, onLogout, onComplete }: 
             {/* Scrollable text container */}
             <div 
               onScroll={handleScroll}
-              className="flex-1 p-6 overflow-y-auto bg-zinc-50 text-zinc-700 text-xs leading-relaxed border-b border-zinc-300 whitespace-pre-wrap font-primary"
+              className="flex-1 min-h-0 p-6 overflow-y-auto bg-zinc-50 text-zinc-700 text-xs leading-relaxed border-b border-zinc-300 whitespace-pre-wrap font-primary select-text"
             >
               {contractText}
             </div>
