@@ -271,7 +271,7 @@ export function WelcomeAboardScreen({ profile, idToken, onLogout, onComplete }: 
         {/* Scrollable NDA Text */}
         <div 
           onScroll={handleScroll}
-          className="flex-1 min-h-0 p-8 overflow-y-scroll custom-scrollbar bg-zinc-50 text-zinc-700 text-xs leading-relaxed border-b border-zinc-300 whitespace-pre-wrap font-primary select-text"
+          className="w-full p-8 overflow-y-auto custom-scrollbar bg-zinc-50 text-zinc-700 text-xs leading-relaxed border-b border-zinc-300 whitespace-pre-wrap font-primary select-text h-[calc(90vh-136px)]"
         >
           {contractText}
         </div>
