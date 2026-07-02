@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowUp, ArrowDown, ArrowUpDown, Filter, X, Search, FileSpreadsheet, FileText, Pencil, Trash2, Check, Plus, Image as ImageIcon } from "lucide-react";
+import { ArrowUp, ArrowDown, ArrowUpDown, Filter, X, Search, FileSpreadsheet, FileText, Pencil, Trash2, Check, Plus, Image as ImageIcon, Ban } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { CustomButton } from "./custom-button";
 import { ConfirmDialog } from "./confirm-dialog";
@@ -58,12 +58,14 @@ interface DataTableProps {
   title?: string;
   onSaveRow?: (updatedRow: any) => void;
   onDeleteRow?: (rowId: string) => void;
+  onBlockRow?: (row: any) => void;
   onEditModeChange?: (isEditMode: boolean) => void;
   onEditRow?: (row: any) => void;
   onAddNew?: () => void;
   addNewText?: string;
   fetching?: boolean;
   syncStatus?: "idle" | "syncing" | "synced";
+  headerActions?: React.ReactNode;
 }
 
 export function DataTable({
@@ -73,6 +75,7 @@ export function DataTable({
   title = "Database Records",
   onSaveRow,
   onDeleteRow,
+  onBlockRow,
   onEditModeChange,
   onEditRow,
   onAddNew,
@@ -80,6 +83,7 @@ export function DataTable({
   fetching = false,
   syncStatus = "idle",
   height = "h-[520px]",
+  headerActions,
 }: DataTableProps) {
   const [tableData, setTableData] = React.useState<any[]>(data);
   const [columns, setColumns] = React.useState<Column[]>(initialColumns);
@@ -572,6 +576,7 @@ export function DataTable({
         )}
         
         <div className="flex items-center gap-2">
+          {headerActions}
           {globalSearch && (
             <CustomButton 
               variant="default"
@@ -594,7 +599,7 @@ export function DataTable({
             </CustomButton>
           )}
 
-          {userRole !== "viewer" && (
+          {userRole !== "viewer" && (onEditRow || onSaveRow || onDeleteRow || onBlockRow) && (
             <CustomButton
               variant={isEditMode ? "dark" : "default"}
               onClick={() => {
@@ -767,7 +772,16 @@ export function DataTable({
                               >
                                 <Pencil size={13} />
                               </button>
-                              {userRole === "admin" && (
+                              {userRole === "admin" && onBlockRow && (
+                                <button
+                                  onClick={() => onBlockRow(row)}
+                                  className="p-1 rounded bg-[#EEEEEE] hover:bg-amber-50 text-amber-600 hover:text-amber-700 border border-zinc-300/80 shadow-sm transition-colors cursor-pointer"
+                                  title="Block user"
+                                >
+                                  <Ban size={13} />
+                                </button>
+                              )}
+                              {userRole === "admin" && onDeleteRow && (
                                 <button
                                   onClick={() => handleDeleteRow(getRowId(row))}
                                   className="p-1 rounded bg-[#EEEEEE] hover:bg-red-50 text-red-600 hover:text-red-700 border border-zinc-300/80 shadow-sm transition-colors cursor-pointer"

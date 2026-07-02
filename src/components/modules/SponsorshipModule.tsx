@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { DataTable, Column } from "../data-table";
 import { NavigationTabs } from "../navigation-tabs";
 import { CustomButton } from "../custom-button";
 import { showToast } from "@/lib/toast";
@@ -187,15 +188,14 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
   const [recLimit, setRecLimit] = React.useState<string>("");
 
   // Dashboard filter state
-  const [dashFilter, setDashFilter] = React.useState<string>("3");
+  const [dashStartDate, setDashStartDate] = React.useState<string>("");
+  const [dashEndDate, setDashEndDate] = React.useState<string>("");
+  const [dashSponsorFilter, setDashSponsorFilter] = React.useState<string>("all");
 
-  // Claim statement print modal states
-  const [isPrintModalOpen, setIsPrintModalOpen] = React.useState<boolean>(false);
-  const [printFilterType, setPrintFilterType] = React.useState<"brand" | "sponsor">("brand");
-  const [printBrandName, setPrintBrandName] = React.useState<string>("");
-  const [printSponsorName, setPrintSponsorName] = React.useState<string>("");
-  const [printStartDate, setPrintStartDate] = React.useState<string>("");
-  const [printEndDate, setPrintEndDate] = React.useState<string>("");
+  // Sidebar Panel collapse states (collapsed by default)
+  const [isTxFormOpen, setIsTxFormOpen] = React.useState<boolean>(false);
+  const [isCatalogFormOpen, setIsCatalogFormOpen] = React.useState<boolean>(false);
+  const [isReceiverFormOpen, setIsReceiverFormOpen] = React.useState<boolean>(false);
 
   // Load static DBs and sponsorship outbox state on mount
   React.useEffect(() => {
@@ -401,6 +401,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
     const brand = brandsList.find(b => b["Display Name"] === item.brandName);
     setSelectedBrand(brand ? String(brand.ID) : item.brandName);
     setSelectedProductSku(item.sku);
+    setIsCatalogFormOpen(true);
     showToast("Editing sponsored product entry...", "info");
   };
 
@@ -569,6 +570,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
     setRecName(rec.name);
     setRecType(rec.type);
     setRecLimit(rec.limit !== null ? String(rec.limit) : "");
+    setIsReceiverFormOpen(true);
     showToast("Editing receiver entity...", "info");
   };
 
@@ -892,7 +894,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
     if (link) {
       setTxSponsoredBy(link.sponsoredBy || "");
     }
-    
+    setIsTxFormOpen(true);
     showToast("Editing transaction entry...", "info");
   };
 
@@ -936,12 +938,22 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
 
   // --- DASHBOARD MATHS ---
   const dashboardStats = React.useMemo(() => {
-    const filterMonths = dashFilter;
-    const now = new Date();
-    const cutoff = new Date();
-    cutoff.setMonth(now.getMonth() - (filterMonths === "all" ? 120 : parseInt(filterMonths)));
+    let filtered = transactions;
 
-    const filtered = transactions.filter(t => new Date(t.date) >= cutoff);
+    if (dashStartDate) {
+      const startEpoch = dateToEpoch(dashStartDate);
+      filtered = filtered.filter(t => t.date >= startEpoch);
+    }
+    if (dashEndDate) {
+      const endEpoch = dateToEpoch(dashEndDate) + 86399999; // Include the end date fully (end of day)
+      filtered = filtered.filter(t => t.date <= endEpoch);
+    }
+    if (dashSponsorFilter && dashSponsorFilter !== "all") {
+      filtered = filtered.filter(t => {
+        const link = catalog.find(c => c.id === t.skuId);
+        return link && link.sponsoredBy === dashSponsorFilter;
+      });
+    }
 
     let totalCartons = 0;
     let totalCost = 0;
@@ -955,7 +967,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
       }
     });
 
-    const summaryMap: Record<string, Record<string, { sponsoredBy: string; ctns: number; cost: number; skuCode: string }>> = {};
+    const summaryMap: Record<string, Record<string, { sponsoredBy: string; ctns: number; qtyPcs: number; cost: number; skuCode: string; uom: number }>> = {};
     filtered.forEach(t => {
       const link = catalog.find(c => c.id === t.skuId);
       if (link) {
@@ -963,15 +975,16 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
         const key = `${sponsor}_${link.brandName}`;
         if (!summaryMap[key]) summaryMap[key] = {};
         if (!summaryMap[key][link.productName]) {
-          summaryMap[key][link.productName] = { sponsoredBy: sponsor, ctns: 0, cost: 0, skuCode: link.sku };
+          summaryMap[key][link.productName] = { sponsoredBy: sponsor, ctns: 0, qtyPcs: 0, cost: 0, skuCode: link.sku, uom: link.uom };
         }
         const ctns = t.qtyPcs / link.uom;
         summaryMap[key][link.productName].ctns += ctns;
+        summaryMap[key][link.productName].qtyPcs += t.qtyPcs;
         summaryMap[key][link.productName].cost += (t.qtyPcs * link.cost);
       }
     });
 
-    const summaryList: Array<{ sponsoredBy: string; brand: string; skuName: string; skuCode: string; ctns: number; cost: number }> = [];
+    const summaryList: Array<{ sponsoredBy: string; brand: string; skuName: string; skuCode: string; ctns: number; qtyPcs: number; uom: number; cost: number }> = [];
     for (const key in summaryMap) {
       const separatorIdx = key.indexOf("_");
       const sponsoredBy = key.substring(0, separatorIdx);
@@ -983,6 +996,8 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
           skuName,
           skuCode: summaryMap[key][skuName].skuCode,
           ctns: summaryMap[key][skuName].ctns,
+          qtyPcs: summaryMap[key][skuName].qtyPcs,
+          uom: summaryMap[key][skuName].uom,
           cost: summaryMap[key][skuName].cost
         });
       }
@@ -994,29 +1009,26 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
       totalCost,
       summaryList
     };
-  }, [dashFilter, transactions, catalog]);
+  }, [dashStartDate, dashEndDate, dashSponsorFilter, transactions, catalog]);
 
   const handlePrintClaim = () => {
-    const filterValue = printFilterType === "brand" ? printBrandName : printSponsorName;
-    if (!filterValue) return;
+    const filterValue = dashSponsorFilter === "all" ? "All Sponsors" : dashSponsorFilter;
 
     let startEpoch = 0;
     let endEpoch = Infinity;
 
-    if (printStartDate) {
-      startEpoch = new Date(printStartDate).setHours(0, 0, 0, 0);
+    if (dashStartDate) {
+      startEpoch = new Date(dashStartDate).setHours(0, 0, 0, 0);
     }
-    if (printEndDate) {
-      endEpoch = new Date(printEndDate).setHours(23, 59, 59, 999);
+    if (dashEndDate) {
+      endEpoch = new Date(dashEndDate).setHours(23, 59, 59, 999);
     }
 
     const relevantTx = transactions.filter(t => {
       const link = catalog.find(c => c.id === t.skuId);
       if (!link) return false;
-      if (printFilterType === "brand") {
-        if (link.brandName !== printBrandName) return false;
-      } else {
-        if (link.sponsoredBy !== printSponsorName) return false;
+      if (dashSponsorFilter && dashSponsorFilter !== "all") {
+        if (link.sponsoredBy !== dashSponsorFilter) return false;
       }
       if (t.date < startEpoch) return false;
       if (t.date > endEpoch) return false;
@@ -1028,15 +1040,13 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
       return;
     }
 
-    setIsPrintModalOpen(false);
-
     let periodText = "All Time";
-    if (printStartDate && printEndDate) {
-      periodText = `${formatEpochToDDMMYYYY(new Date(printStartDate).getTime())} - ${formatEpochToDDMMYYYY(new Date(printEndDate).getTime())}`;
-    } else if (printStartDate) {
-      periodText = `From ${formatEpochToDDMMYYYY(new Date(printStartDate).getTime())}`;
-    } else if (printEndDate) {
-      periodText = `Up to ${formatEpochToDDMMYYYY(new Date(printEndDate).getTime())}`;
+    if (dashStartDate && dashEndDate) {
+      periodText = `${formatEpochToDDMMYYYY(new Date(dashStartDate).getTime())} - ${formatEpochToDDMMYYYY(new Date(dashEndDate).getTime())}`;
+    } else if (dashStartDate) {
+      periodText = `From ${formatEpochToDDMMYYYY(new Date(dashStartDate).getTime())}`;
+    } else if (dashEndDate) {
+      periodText = `Up to ${formatEpochToDDMMYYYY(new Date(dashEndDate).getTime())}`;
     }
 
     // helper to format cartons and loose pieces
@@ -1052,39 +1062,66 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
       }
     };
 
-    // SECTION 1: Product Summary grouping by SKU
+    // SECTION 1: Product Summary grouped by Brands
     // Columns: Brands, Product, Carton Given Qty Carton and Loose, Cost Value
-    const summaryMap: Record<string, { brandName: string; productDisplay: string; totalPcs: number; cost: number; uom: number }> = {};
+    const brandGroups: Record<string, Array<{ productDisplay: string; totalPcs: number; cost: number; uom: number }>> = {};
     relevantTx.forEach(t => {
       const link = catalog.find(c => c.id === t.skuId);
       if (!link) return;
+      const brand = link.brandName;
+      if (!brandGroups[brand]) {
+        brandGroups[brand] = [];
+      }
       const productDisplay = `[${link.sku}] ${link.productName}`;
       const lineCost = t.qtyPcs * link.cost;
 
-      if (!summaryMap[t.skuId]) {
-        summaryMap[t.skuId] = {
-          brandName: link.brandName,
+      let existing = brandGroups[brand].find(item => item.productDisplay === productDisplay);
+      if (!existing) {
+        existing = {
           productDisplay,
           totalPcs: 0,
           cost: 0,
           uom: link.uom
         };
+        brandGroups[brand].push(existing);
       }
-      summaryMap[t.skuId].totalPcs += t.qtyPcs;
-      summaryMap[t.skuId].cost += lineCost;
+      existing.totalPcs += t.qtyPcs;
+      existing.cost += lineCost;
     });
 
     let section1RowsHtml = "";
     let totalClaim = 0;
-    Object.values(summaryMap).forEach(item => {
-      totalClaim += item.cost;
-      const cartonLooseStr = formatCartonAndLoose(item.totalPcs, item.uom);
+
+    Object.entries(brandGroups).forEach(([brandName, items]) => {
+      // Brand header row
       section1RowsHtml += `
-        <tr style="border-bottom: 1px solid #e2e8f0;">
-          <td style="padding: 8px 10px; font-size: 12px;">${item.brandName}</td>
-          <td style="padding: 8px 10px; font-size: 12px;">${item.productDisplay}</td>
-          <td style="padding: 8px 10px; font-size: 12px; text-align: right;">${cartonLooseStr}</td>
-          <td style="padding: 8px 10px; font-size: 12px; text-align: right;">$${item.cost.toFixed(2)}</td>
+        <tr style="background-color: #f1f5f9; font-weight: bold;">
+          <td colspan="4" style="padding: 10px; font-size: 12px; color: #0f172a; border-top: 1px solid #cbd5e1; border-bottom: 1px solid #cbd5e1;">
+            Brand: ${brandName}
+          </td>
+        </tr>
+      `;
+
+      let brandTotal = 0;
+      items.forEach(item => {
+        brandTotal += item.cost;
+        totalClaim += item.cost;
+        const cartonLooseStr = formatCartonAndLoose(item.totalPcs, item.uom);
+        section1RowsHtml += `
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 8px 10px; font-size: 11px; color: #64748b; font-style: italic;">${brandName}</td>
+            <td style="padding: 8px 10px; font-size: 12px; font-weight: 500;">${item.productDisplay}</td>
+            <td style="padding: 8px 10px; font-size: 12px; text-align: right; font-weight: 600;">${cartonLooseStr}</td>
+            <td style="padding: 8px 10px; font-size: 12px; text-align: right; font-weight: 500;">$${item.cost.toFixed(2)}</td>
+          </tr>
+        `;
+      });
+
+      // Brand subtotal row
+      section1RowsHtml += `
+        <tr style="font-weight: bold; background-color: #f8fafc;">
+          <td colspan="3" style="padding: 8px 10px; font-size: 11px; text-align: right; color: #475569;">${brandName} Subtotal:</td>
+          <td style="padding: 8px 10px; font-size: 12px; text-align: right; color: #0f172a;">$${brandTotal.toFixed(2)}</td>
         </tr>
       `;
     });
@@ -1248,13 +1285,21 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
     return Array.from(new Set(catalog.map(c => c.sponsoredBy).filter(Boolean)));
   }, [catalog]);
 
+  const printSponsorOptions = React.useMemo(() => {
+    const list = uniqueCatalogSponsors.map(sponsor => ({
+      value: sponsor,
+      label: sponsor
+    }));
+    return [{ value: "all", label: "All Sponsore" }, ...list];
+  }, [uniqueCatalogSponsors]);
+
   // --- MEMOIZED SEARCHABLE SELECT DATA SOURCES ---
   const receiverOptions = React.useMemo(() => {
     return receivers.map(r => ({ value: r.id, label: `${r.name} (${r.type})` }));
   }, [receivers]);
 
   const filteredCatalog = React.useMemo(() => {
-    if (!txSponsoredBy) return catalog;
+    if (!txSponsoredBy) return [];
     return catalog.filter(c => c.sponsoredBy === txSponsoredBy);
   }, [catalog, txSponsoredBy]);
 
@@ -1275,8 +1320,168 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
     return filteredProductsSelect.map(p => ({ value: p.SKU, label: `${p.SKU} - ${p["Display Name"]}` }));
   }, [filteredProductsSelect]);
 
+  // --- DATA TABLE COLUMNS & DATA SOURCES ---
+  const transactionColumns: Column[] = React.useMemo(() => [
+    { id: "sponsoredBy", header: "Sponsored By", accessor: "sponsoredBy" },
+    { id: "date", header: "Date", accessor: "date_display" },
+    { id: "ref", header: "Ref No.", accessor: "ref" },
+    { id: "receiverName", header: "Receiver", accessor: "receiverName" },
+    { id: "brandSku", header: "Brand & SKU", accessor: "brandSku" },
+    { id: "qtyPcs", header: "Pcs", accessor: "qtyPcs" },
+    { id: "totalAmount", header: "Total Amount", accessor: "totalAmount" },
+    { id: "remark", header: "Remark", accessor: "remark" }
+  ], []);
+
+  const transactionsTableData = React.useMemo(() => {
+    return [...transactions]
+      .sort((a, b) => b.date - a.date)
+      .map(tx => {
+        const rec = receivers.find(r => r.id === tx.receiverId) || { name: "Unknown" };
+        const link = catalog.find(c => c.id === tx.skuId) || { brandName: "Unknown", sku: "N/A", uom: 1, cost: 0, sponsoredBy: "" };
+        const totalAmount = tx.qtyPcs * link.cost;
+        return {
+          ...tx,
+          id: tx.id,
+          sponsoredBy: link.sponsoredBy || "-",
+          date_display: formatEpochToDDMMYYYY(tx.date),
+          date_display_raw: tx.date, // for sorting
+          ref: tx.ref,
+          receiverName: rec.name,
+          brandSku: link.sponsoredBy 
+            ? `[${link.sponsoredBy} - ${link.brandName}] ${link.sku}`
+            : `[${link.brandName}] ${link.sku}`,
+          qtyPcs: tx.qtyPcs,
+          totalAmount: `$${totalAmount.toFixed(2)}`,
+          totalAmount_raw: totalAmount, // for sorting
+          remark: tx.remark || "-"
+        };
+      });
+  }, [transactions, receivers, catalog]);
+
+  const dashboardColumns: Column[] = React.useMemo(() => [
+    { id: "sponsoredBy", header: "Sponsored By", accessor: "sponsoredBy" },
+    { id: "brand", header: "Brand Name", accessor: "brand" },
+    { id: "skuCode", header: "SKU", accessor: "skuCode" },
+    { id: "skuName", header: "Product Name", accessor: "skuName" },
+    { id: "given", header: "Given", accessor: "given" },
+    { id: "cost", header: "Est. Cost Value", accessor: "cost" }
+  ], []);
+
+  const dashboardTableData = React.useMemo(() => {
+    return dashboardStats.summaryList.map((item, idx) => {
+      const uom = item.uom || 24;
+      const cartons = Math.floor(item.qtyPcs / uom);
+      const pcs = item.qtyPcs % uom;
+      
+      let givenText = "";
+      if (cartons === 0 && pcs === 0) {
+        givenText = "0 Carton";
+      } else if (cartons > 0 && pcs === 0) {
+        givenText = `${cartons} Carton`;
+      } else if (cartons === 0 && pcs > 0) {
+        givenText = `${pcs} Pcs`;
+      } else {
+        givenText = `${cartons} Carton and ${pcs} Pcs`;
+      }
+
+      return {
+        id: idx,
+        sponsoredBy: item.sponsoredBy || "-",
+        brand: item.brand,
+        skuCode: item.skuCode,
+        skuName: item.skuName,
+        given: givenText,
+        given_raw: item.qtyPcs, // for sorting
+        cost: `$${item.cost.toFixed(2)}`,
+        cost_raw: item.cost // for sorting
+      };
+    });
+  }, [dashboardStats.summaryList]);
+
+  const catalogColumns: Column[] = React.useMemo(() => [
+    { id: "sponsoredBy", header: "Sponsored By", accessor: "sponsoredBy" },
+    { id: "brandName", header: "Brand Owner", accessor: "brandName" },
+    { id: "sku", header: "SKU", accessor: "sku" },
+    { id: "productName", header: "Product Name", accessor: "productName" },
+    { id: "uom", header: "UOM (Pcs/Ctn)", accessor: "uom" },
+    { id: "cost", header: "Cost/Pc", accessor: "cost" },
+    { id: "costCtn", header: "Cost/Ctn", accessor: "costCtn" }
+  ], []);
+
+  const catalogTableData = React.useMemo(() => {
+    return catalog.map(item => ({
+      ...item,
+      id: item.id,
+      sponsoredBy: item.sponsoredBy || "-",
+      brandName: item.brandName,
+      sku: item.sku,
+      productName: item.productName,
+      uom: item.uom,
+      cost: `$${item.cost.toFixed(2)}`,
+      cost_raw: item.cost, // for sorting
+      costCtn: `$${(item.cost * item.uom).toFixed(2)}`,
+      costCtn_raw: item.cost * item.uom // for sorting
+    }));
+  }, [catalog]);
+
+  const receiverColumns: Column[] = React.useMemo(() => [
+    { id: "name", header: "Entity Name", accessor: "name" },
+    { id: "type_display", header: "Limit Type", accessor: "type_display" },
+    { id: "limit", header: "Limit (Ctns)", accessor: "limit" },
+    { id: "given", header: "Given (Ctns)", accessor: "given" },
+    { id: "balance", header: "Balance (Ctns)", accessor: "balance" },
+    { id: "status", header: "Status", accessor: "status" }
+  ], []);
+
+  const receiversTableData = React.useMemo(() => {
+    return receivers.map(rec => {
+      const given = calculateGivenCartons(rec.id, rec.type);
+      const isLimited = rec.type !== "open";
+      const balance = isLimited ? (rec.limit! - given) : null;
+      
+      let statusBadge = "";
+      let statusText = "Open";
+      if (isLimited) {
+        if (balance! <= 0) {
+          statusBadge = "bg-red-100 text-red-800 border-red-200";
+          statusText = "Limit Reached";
+        } else if (balance! <= (rec.limit! * 0.2)) {
+          statusBadge = "bg-amber-100 text-amber-800 border-amber-200";
+          statusText = "Near Limit";
+        } else {
+          statusBadge = "bg-green-100 text-green-800 border-green-200";
+          statusText = "Active";
+        }
+      } else {
+        statusBadge = "bg-blue-100 text-blue-800 border-blue-200";
+      }
+
+      const badgeElement = (
+        <span className={`px-2 py-0.5 text-[10px] font-bold rounded-md border ${statusBadge}`}>
+          {statusText}
+        </span>
+      );
+
+      return {
+        ...rec,
+        id: rec.id,
+        name: rec.name,
+        type_display: rec.type === "monthly" ? "Monthly" : rec.type === "onetime" ? "One-Time Take" : "Open",
+        type_display_raw: rec.type, // for sorting
+        limit: isLimited ? rec.limit : "∞",
+        limit_raw: isLimited ? rec.limit : Infinity,
+        given: given.toFixed(1),
+        given_raw: given,
+        balance: isLimited ? balance!.toFixed(1) : "∞",
+        balance_raw: isLimited ? balance : Infinity,
+        status: badgeElement,
+        status_raw: statusText // for sorting
+      };
+    });
+  }, [receivers, transactions, catalog]);
+
   return (
-    <div className="flex flex-col gap-6 font-primary text-zinc-900 select-none border-t border-zinc-200 pt-1">
+    <div className="flex flex-col gap-6 font-primary text-zinc-900 select-none">
       
       {/* Navigation sub-tabs */}
       <NavigationTabs 
@@ -1284,49 +1489,61 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
         activeTabId={activeTab} 
         onTabSelect={(id) => setActiveTab(id)} 
         action={
-          <div className="flex gap-2">
-            {activeTab === "dashboard" && (
+          activeTab === "dashboard" ? (
+            <div className="flex items-center gap-3">
+              {(dashStartDate || dashEndDate || dashSponsorFilter !== "all") && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDashStartDate("");
+                    setDashEndDate("");
+                    setDashSponsorFilter("all");
+                  }}
+                  className="text-xs text-zinc-500 hover:text-zinc-800 underline font-semibold transition-colors cursor-pointer whitespace-nowrap mr-1"
+                  title="Clear range filter"
+                >
+                  Clear Filter
+                </button>
+              )}
+              <div className="w-52 text-xs">
+                <SearchableSelect
+                  options={printSponsorOptions}
+                  value={dashSponsorFilter}
+                  onChange={(val) => setDashSponsorFilter(val || "all")}
+                  placeholder="Select Sponsor..."
+                />
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-bold">
+                <span>Range</span>
+                <input
+                  type="date"
+                  value={dashStartDate}
+                  onChange={(e) => setDashStartDate(e.target.value)}
+                  className="bg-white border border-zinc-300 rounded-lg p-1.5 font-semibold text-zinc-900 focus:outline-none focus:border-zinc-400 h-9"
+                />
+                <span className="mx-0.5 text-zinc-400 font-normal text-sm">-</span>
+                <input
+                  type="date"
+                  value={dashEndDate}
+                  onChange={(e) => setDashEndDate(e.target.value)}
+                  className="bg-white border border-zinc-300 rounded-lg p-1.5 font-semibold text-zinc-900 focus:outline-none focus:border-zinc-400 h-9"
+                />
+              </div>
               <CustomButton 
-                onClick={() => setIsPrintModalOpen(true)}
+                onClick={handlePrintClaim}
                 variant="default"
               >
                 <Printer size={13} className="text-zinc-500" />
                 Print Claim
               </CustomButton>
-            )}
-            <CustomButton 
-              onClick={() => fetchAllFreshData(true)}
-              disabled={fetching}
-              variant="secondary"
-            >
-              <RefreshCw size={13} className={`text-zinc-600 ${fetching ? "animate-spin" : ""}`} />
-              Update
-            </CustomButton>
-          </div>
+            </div>
+          ) : undefined
         }
       />
 
       {/* 1. DASHBOARD TAB */}
       {activeTab === "dashboard" && (
         <div className="flex flex-col gap-6 animate-tableFadeInOnly">
-          {/* Dashboard Header filters */}
-          <div className="flex justify-between items-center bg-white border border-zinc-300/40 p-4 rounded-xl shadow-sm">
-            <div>
-              <h3 className="font-bold text-zinc-950 text-base">Dashboard Insights</h3>
-              <p className="text-xs text-zinc-500 mt-0.5">Overview of sponsorship quantities and cost value.</p>
-            </div>
-            <select 
-              value={dashFilter}
-              onChange={(e) => setDashFilter(e.target.value)}
-              className="text-xs bg-white border border-zinc-300 rounded-lg p-2 font-bold cursor-pointer text-zinc-700 focus:outline-none focus:border-zinc-400"
-            >
-              <option value="3">Last 3 Months</option>
-              <option value="6">Last 6 Months</option>
-              <option value="9">Last 9 Months</option>
-              <option value="12">Last 12 Months</option>
-              <option value="all">All Time</option>
-            </select>
-          </div>
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -1369,712 +1586,445 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
           </div>
 
           {/* Recent Summary table */}
-          <div className="bg-white border border-zinc-300/40 rounded-xl shadow-sm overflow-hidden flex flex-col">
-            <div className="px-5 py-3.5 bg-zinc-50 border-b border-zinc-200">
-              <h4 className="font-bold text-zinc-800 text-sm">Zonal Distribution Summary</h4>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-zinc-50 border-b border-zinc-200 text-zinc-500 font-bold uppercase tracking-wider">
-                    <th className="px-6 py-3">Sponsored By</th>
-                    <th className="px-6 py-3">Brand Name</th>
-                    <th className="px-6 py-3">SKU</th>
-                    <th className="px-6 py-3">Product Name</th>
-                    <th className="px-6 py-3 text-right">Cartons Given (Filtered)</th>
-                    <th className="px-6 py-3 text-right">Est. Cost Value</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-200 text-zinc-700">
-                  {dashboardStats.summaryList.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="text-center p-8 italic text-zinc-400">
-                        No distribution logs found for the filtered period.
-                      </td>
-                    </tr>
-                  ) : (
-                    dashboardStats.summaryList.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-zinc-50/50">
-                        <td className="px-6 py-4 font-bold text-zinc-900">{item.sponsoredBy || "-"}</td>
-                        <td className="px-6 py-4 font-bold text-zinc-900">{item.brand}</td>
-                        <td className="px-6 py-4 font-mono">{item.skuCode}</td>
-                        <td className="px-6 py-4">{item.skuName}</td>
-                        <td className="px-6 py-4 text-right font-bold">{item.ctns.toFixed(2)}</td>
-                        <td className="px-6 py-4 text-right font-bold text-zinc-900">${item.cost.toFixed(2)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+          <div className="overflow-hidden flex flex-col">
+            <DataTable
+              columns={dashboardColumns}
+              data={dashboardTableData}
+              userRole={userRole}
+              title="Sponsore Summary"
+              fetching={fetching}
+              height="h-[calc(100vh-340px)]"
+            />
           </div>
         </div>
       )}
 
       {/* 2. TRANSACTION LOGGING TAB */}
       {activeTab === "transaction" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-tableFadeInOnly">
-          {/* Form col */}
-          <div className="bg-white border border-zinc-300/40 p-5 rounded-xl shadow-sm h-fit">
-            <h3 className="font-bold text-zinc-900 border-b pb-2 text-sm uppercase tracking-wider">
-              {txId ? "Edit Entry" : "Log Output Entry"}
-            </h3>
-            <form onSubmit={handleTransactionSubmit} className="flex flex-col gap-4 mt-4 text-xs">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block mb-1 text-zinc-500 font-bold uppercase">Ref Number</label>
-                  <input 
-                    type="text" 
-                    value={txRef}
-                    onChange={(e) => setTxRef(e.target.value)}
-                    placeholder="e.g. DOC-8823"
-                    required
-                    disabled={userRole === "viewer"}
-                    className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
-                  />
-                </div>
-                <div>
-                  <label className="block mb-1 text-zinc-500 font-bold uppercase">Date</label>
-                  <input 
-                    type="date" 
-                    value={txDate}
-                    onChange={(e) => setTxDate(e.target.value)}
-                    required
-                    disabled={userRole === "viewer"}
-                    className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block mb-1 text-zinc-500 font-bold uppercase">Receiver Entity</label>
-                <SearchableSelect
-                  options={receiverOptions}
-                  value={txReceiverId}
-                  onChange={(val) => setTxReceiverId(val)}
-                  placeholder="Search and select receiver..."
-                  disabled={userRole === "viewer"}
-                />
-                {txReceiverId && (
-                  <p className={`text-[10px] mt-1.5 font-bold ${currentBalanceStatus.warningClass || "text-zinc-500"}`}>
-                    {currentBalanceStatus.msg}
-                  </p>
-                )}
-              </div>
-
-              {/* SKU Items List section */}
-              <div className="border border-zinc-200 rounded-lg p-3 bg-zinc-50/50 mt-1 flex flex-col gap-3">
-                <span className="font-bold text-[10px] text-zinc-400 uppercase tracking-wider block">Add SKUs to Transaction</span>
-                <div>
-                  <label className="block mb-1 text-[10px] text-zinc-500 font-semibold uppercase">Filter by Sponsor</label>
-                  <select
-                    value={txSponsoredBy}
-                    onChange={(e) => {
-                      setTxSponsoredBy(e.target.value);
-                      setTxSkuId("");
-                    }}
-                    disabled={userRole === "viewer"}
-                    className="w-full text-xs bg-white border border-zinc-300 rounded-lg p-2 text-zinc-900 font-semibold focus:outline-none focus:border-zinc-400 h-8"
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-tableFadeInOnly">
+            {/* History table col (left side) */}
+            <div className={`${isTxFormOpen ? "lg:col-span-2" : "lg:col-span-3"} overflow-hidden flex flex-col`}>
+              <DataTable
+                columns={transactionColumns}
+                data={transactionsTableData}
+                userRole={userRole}
+                title="Distribution Log History"
+                fetching={fetching}
+                onEditRow={(row) => handleEditTransaction(row.id)}
+                onDeleteRow={(id) => handleDeleteTransaction(id)}
+                height="h-[calc(100vh-240px)]"
+                headerActions={
+                  <CustomButton
+                    variant={isTxFormOpen ? "dark" : "default"}
+                    onClick={() => setIsTxFormOpen(!isTxFormOpen)}
                   >
-                    <option value="">All Sponsors</option>
-                    {uniqueCatalogSponsors.map(sponsor => (
-                      <option key={sponsor} value={sponsor}>{sponsor}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex gap-2 items-end">
-                  <div className="flex-1">
-                    <label className="block mb-1 text-[10px] text-zinc-500 font-semibold uppercase">Sku</label>
-                    <SearchableSelect
-                      options={catalogOptions}
-                      value={txSkuId}
-                      onChange={(val) => setTxSkuId(val)}
-                      placeholder="Search SKU..."
-                      disabled={userRole === "viewer"}
-                    />
-                  </div>
-                  <div className="w-24">
-                    <label className="block mb-1 text-[10px] text-zinc-500 font-semibold uppercase">Qty (Pcs)</label>
-                    <input 
-                      type="number" 
-                      value={txQty}
-                      onChange={(e) => setTxQty(e.target.value)}
-                      placeholder="Pcs"
-                      min={1}
-                      disabled={userRole === "viewer"}
-                      className="w-full h-8 bg-white border border-zinc-300 rounded-lg px-2 text-zinc-900 focus:outline-none text-xs"
-                    />
-                  </div>
-                  {userRole !== "viewer" && (
-                    <Plus 
-                      size={20} 
-                      onClick={handleAddItemToList}
-                      className="cursor-pointer text-zinc-500 hover:text-zinc-900 transition-colors flex-shrink-0 mb-1.5"
-                    />
-                  )}
-                </div>
-
-                {txItems.length > 0 && (
-                  <div className="mt-2 border-t border-zinc-200 pt-2 flex flex-col gap-1.5 max-h-40 overflow-y-auto">
-                    {txItems.map((item, idx) => {
-                      const link = catalog.find(c => c.id === item.skuId);
-                      const code = link ? link.sku : "N/A";
-                      const itemCost = link ? link.cost : 0;
-                      const totalAmount = item.qtyPcs * itemCost;
-                      return (
-                        <div key={idx} className="flex justify-between items-center bg-white p-2 rounded-lg border border-zinc-200 text-[11px] font-medium">
-                          <div className="truncate pr-2">
-                            <span className="font-bold text-zinc-900">{code}</span>
-                            <span className="text-zinc-500 ml-1.5">({item.qtyPcs} pcs / ${totalAmount.toFixed(2)})</span>
-                          </div>
-                          {userRole !== "viewer" && (
-                            <Trash2 
-                              size={14} 
-                              onClick={(e) => {
-                                e.preventDefault();
-                                setTxItems(prev => prev.filter((_, i) => i !== idx));
-                              }}
-                              className="text-zinc-400 hover:text-red-600 cursor-pointer flex-shrink-0 transition-colors"
-                            />
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block mb-1 text-zinc-500 font-bold uppercase">Remark</label>
-                <textarea 
-                  rows={3}
-                  value={txRemark}
-                  onChange={(e) => setTxRemark(e.target.value)}
-                  placeholder="Optional notes"
-                  disabled={userRole === "viewer"}
-                  className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold resize-none text-xs"
-                />
-              </div>
-              <div className="flex gap-2 mt-2">
-                <CustomButton 
-                  type="submit"
-                  disabled={txItems.length === 0 || userRole === "viewer"}
-                  variant={txId ? "secondary" : "dark"}
-                  className="flex-1 h-10"
-                >
-                  {userRole === "viewer" ? "View Only" : txId ? "Update Entry" : "Record Entry"}
-                </CustomButton>
-                {txId && (
-                  <CustomButton 
-                    type="button" 
-                    onClick={handleCancelTxEdit}
-                    variant="default"
-                    className="h-10"
-                  >
-                    Cancel
+                    {isTxFormOpen ? "Hide Panel" : "Add New Record"}
                   </CustomButton>
-                )}
-              </div>
-            </form>
-          </div>
-
-          {/* History table col */}
-          <div className="lg:col-span-2 bg-white border border-zinc-300/40 rounded-xl shadow-sm overflow-hidden flex flex-col">
-            <div className="px-5 py-3.5 bg-zinc-50 border-b border-zinc-200">
-              <h4 className="font-bold text-zinc-800 text-sm">Distribution Log History</h4>
+                }
+              />
             </div>
-            <div className="overflow-x-auto flex-1">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-zinc-50 border-b border-zinc-200 text-zinc-500 font-bold uppercase tracking-wider">
-                    <th className="px-4 py-3">Date</th>
-                    <th className="px-4 py-3">Ref No.</th>
-                    <th className="px-4 py-3">Receiver</th>
-                    <th className="px-4 py-3">Brand & SKU</th>
-                    <th className="px-4 py-3 text-right">Pcs</th>
-                    <th className="px-4 py-3 text-right">Total Amount</th>
-                    <th className="px-4 py-3">Remark</th>
-                    <th className="px-4 py-3 text-center">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-200 text-zinc-700">
-                  {transactions.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="text-center p-8 italic text-zinc-400">
-                        No transactions logged yet.
-                      </td>
-                    </tr>
-                  ) : (
-                    [...transactions]
-                      .sort((a, b) => b.date - a.date)
-                      .map((tx) => {
-                        const rec = receivers.find(r => r.id === tx.receiverId) || { name: "Unknown" };
-                        const link = catalog.find(c => c.id === tx.skuId) || { brandName: "Unknown", sku: "N/A", uom: 1, cost: 0 };
-                        const totalAmount = tx.qtyPcs * link.cost;
 
-                        return (
-                          <tr key={tx.id} className="hover:bg-zinc-50/50">
-                            <td className="px-4 py-3 whitespace-nowrap font-mono">{formatEpochToDDMMYYYY(tx.date)}</td>
-                            <td className="px-4 py-3 font-bold text-zinc-900">{tx.ref}</td>
-                            <td className="px-4 py-3">{rec.name}</td>
-                            <td className="px-4 py-3">[{link.brandName}] {link.sku}</td>
-                            <td className="px-4 py-3 text-right font-bold">{tx.qtyPcs}</td>
-                            <td className="px-4 py-3 text-right font-bold text-zinc-900">${totalAmount.toFixed(2)}</td>
-                            <td className="px-4 py-3 truncate max-w-xs">{tx.remark}</td>
-                            <td className="px-4 py-3 text-center flex justify-center gap-2">
+            {/* Form col (right side, collapsible) */}
+            {isTxFormOpen && (
+              <div className="lg:col-span-1 bg-white border border-zinc-300/40 p-5 rounded-xl shadow-sm h-fit">
+                <h3 className="font-bold text-zinc-900 border-b pb-2 text-sm uppercase tracking-wider">
+                  {txId ? "Edit Entry" : "Log Output Entry"}
+                </h3>
+                <form onSubmit={handleTransactionSubmit} className="flex flex-col gap-4 mt-4 text-xs">
+                  <div>
+                    <label className="block mb-1 text-zinc-500 font-bold uppercase">Sponsored By</label>
+                    <select
+                      value={txSponsoredBy}
+                      onChange={(e) => {
+                        const newSponsor = e.target.value;
+                        if (txItems.length > 0) {
+                          if (confirm("Changing the sponsor will clear the currently added SKUs. Do you want to proceed?")) {
+                            setTxSponsoredBy(newSponsor);
+                            setTxSkuId("");
+                            setTxItems([]);
+                          }
+                        } else {
+                          setTxSponsoredBy(newSponsor);
+                          setTxSkuId("");
+                        }
+                      }}
+                      required
+                      disabled={userRole === "viewer"}
+                      className="w-full text-xs bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 font-semibold focus:outline-none focus:border-zinc-400 h-10"
+                    >
+                      <option value="" disabled>Select Sponsor...</option>
+                      {uniqueCatalogSponsors.map(sponsor => (
+                        <option key={sponsor} value={sponsor}>{sponsor}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block mb-1 text-zinc-500 font-bold uppercase">Ref Number</label>
+                      <input 
+                        type="text" 
+                        value={txRef}
+                        onChange={(e) => setTxRef(e.target.value)}
+                        placeholder="e.g. DOC-8823"
+                        required
+                        disabled={userRole === "viewer"}
+                        className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block mb-1 text-zinc-500 font-bold uppercase">Date</label>
+                      <input 
+                        type="date" 
+                        value={txDate}
+                        onChange={(e) => setTxDate(e.target.value)}
+                        required
+                        disabled={userRole === "viewer"}
+                        className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-zinc-500 font-bold uppercase">Receiver Entity</label>
+                    <SearchableSelect
+                      options={receiverOptions}
+                      value={txReceiverId}
+                      onChange={(val) => setTxReceiverId(val)}
+                      placeholder="Search and select receiver..."
+                      disabled={userRole === "viewer"}
+                    />
+                    {txReceiverId && (
+                      <p className={`text-[10px] mt-1.5 font-bold ${currentBalanceStatus.warningClass || "text-zinc-500"}`}>
+                        {currentBalanceStatus.msg}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* SKU Items List section */}
+                  <div className="border border-zinc-200 rounded-lg p-3 bg-zinc-50/50 mt-1 flex flex-col gap-3">
+                    <span className="font-bold text-[10px] text-zinc-400 uppercase tracking-wider block">Add SKUs to Transaction</span>
+                    <div className="flex gap-2 items-end">
+                      <div className="flex-1">
+                        <label className="block mb-1 text-[10px] text-zinc-500 font-semibold uppercase">Sku</label>
+                        <SearchableSelect
+                          options={catalogOptions}
+                          value={txSkuId}
+                          onChange={(val) => setTxSkuId(val)}
+                          placeholder={txSponsoredBy ? "Search SKU..." : "Select sponsor first..."}
+                          disabled={userRole === "viewer" || !txSponsoredBy}
+                        />
+                      </div>
+                      <div className="w-24">
+                        <label className="block mb-1 text-[10px] text-zinc-500 font-semibold uppercase">Qty (Pcs)</label>
+                        <input 
+                          type="number" 
+                          value={txQty}
+                          onChange={(e) => setTxQty(e.target.value)}
+                          placeholder="Pcs"
+                          min={1}
+                          disabled={userRole === "viewer"}
+                          className="w-full h-8 bg-white border border-zinc-300 rounded-lg px-2 text-zinc-900 focus:outline-none text-xs"
+                        />
+                      </div>
+                      {userRole !== "viewer" && (
+                        <Plus 
+                          size={20} 
+                          onClick={handleAddItemToList}
+                          className="cursor-pointer text-zinc-500 hover:text-zinc-900 transition-colors flex-shrink-0 mb-1.5"
+                        />
+                      )}
+                    </div>
+
+                    {txItems.length > 0 && (
+                      <div className="mt-2 border-t border-zinc-200 pt-2 flex flex-col gap-1.5 max-h-40 overflow-y-auto">
+                        {txItems.map((item, idx) => {
+                          const link = catalog.find(c => c.id === item.skuId);
+                          const code = link ? link.sku : "N/A";
+                          const itemCost = link ? link.cost : 0;
+                          const totalAmount = item.qtyPcs * itemCost;
+                          return (
+                            <div key={idx} className="flex justify-between items-center bg-white p-2 rounded-lg border border-zinc-200 text-[11px] font-medium">
+                              <div className="truncate pr-2">
+                                <span className="font-bold text-zinc-900">{code}</span>
+                                <span className="text-zinc-500 ml-1.5">({item.qtyPcs} pcs / ${totalAmount.toFixed(2)})</span>
+                              </div>
                               {userRole !== "viewer" && (
-                                <Pencil 
-                                  size={14} 
-                                  onClick={() => handleEditTransaction(tx.id)}
-                                  className="text-zinc-400 hover:text-blue-600 cursor-pointer transition-colors"
-                                />
-                              )}
-                              {userRole === "admin" && (
                                 <Trash2 
                                   size={14} 
-                                  onClick={() => handleDeleteTransaction(tx.id)}
-                                  className="text-zinc-400 hover:text-red-600 cursor-pointer transition-colors"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    setTxItems(prev => prev.filter((_, i) => i !== idx));
+                                  }}
+                                  className="text-zinc-400 hover:text-red-600 cursor-pointer flex-shrink-0 transition-colors"
                                 />
                               )}
-                            </td>
-                          </tr>
-                        );
-                      })
-                  )}
-                </tbody>
-              </table>
-            </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block mb-1 text-zinc-500 font-bold uppercase">Remark</label>
+                    <textarea 
+                      rows={3}
+                      value={txRemark}
+                      onChange={(e) => setTxRemark(e.target.value)}
+                      placeholder="Optional notes"
+                      disabled={userRole === "viewer"}
+                      className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold resize-none text-xs"
+                    />
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    <CustomButton 
+                      type="submit"
+                      disabled={txItems.length === 0 || userRole === "viewer"}
+                      variant={txId ? "secondary" : "dark"}
+                      className="flex-1 h-10"
+                    >
+                      {userRole === "viewer" ? "View Only" : txId ? "Update Entry" : "Record Entry"}
+                    </CustomButton>
+                    {txId && (
+                      <CustomButton 
+                        type="button" 
+                        onClick={handleCancelTxEdit}
+                        variant="default"
+                        className="h-10"
+                      >
+                        Cancel
+                      </CustomButton>
+                    )}
+                  </div>
+                </form>
+              </div>
+            )}
           </div>
         </div>
       )}
 
       {/* 3. SPONSORED BY TAB */}
       {activeTab === "sponsored" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-tableFadeInOnly">
-          {/* Form col */}
-          <div className="bg-white border border-zinc-300/40 p-5 rounded-xl shadow-sm h-fit">
-            <h3 className="font-bold text-zinc-900 border-b pb-2 text-sm uppercase tracking-wider">
-              {sponsoredCatalogId ? "Edit Sponsored Product" : "Add Sponsored Product"}
-            </h3>
-            <form onSubmit={handleAddCatalog} className="flex flex-col gap-4 mt-4 text-xs">
-              <div>
-                <label className="block mb-1 text-zinc-500 font-bold uppercase">Sponsored By</label>
-                <input 
-                  type="text" 
-                  value={sponsoredBy}
-                  onChange={(e) => setSponsoredBy(e.target.value)}
-                  placeholder="e.g. HSG Global"
-                  required
-                  disabled={userRole === "viewer"}
-                  className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
-                />
-              </div>
-              <div>
-                <label className="block mb-1 text-zinc-500 font-bold uppercase">Brand Owner</label>
-                <SearchableSelect
-                  options={brandOptions}
-                  value={selectedBrand}
-                  onChange={(val) => {
-                    setSelectedBrand(val);
-                    setSelectedProductSku("");
-                  }}
-                  placeholder="Search and select brand owner..."
-                  disabled={userRole === "viewer"}
-                />
-              </div>
-              <div>
-                <label className="block mb-1 text-zinc-500 font-bold uppercase">Product SKU</label>
-                <SearchableSelect
-                  options={productOptions}
-                  value={selectedProductSku}
-                  onChange={(val) => setSelectedProductSku(val)}
-                  disabled={!selectedBrand || userRole === "viewer"}
-                  placeholder={selectedBrand ? "Search product SKU..." : "Select Brand first"}
-                />
-              </div>
-              {selectedProductSku && (
-                <div className="p-3 bg-zinc-50 rounded-lg border border-zinc-200/80 flex flex-col gap-2 font-medium">
-                  <div className="flex justify-between">
-                    <span className="text-zinc-400 uppercase font-bold text-[10px]">UOM (Pieces/Ctn)</span>
-                    <span className="font-bold text-zinc-900">
-                      {productsList.find(p => p.SKU === selectedProductSku)?.Carton || 24} pcs
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-zinc-400 uppercase font-bold text-[10px]">Cost per Piece</span>
-                    <span className="font-bold text-zinc-900">
-                      ${parseFloat(productsList.find(p => p.SKU === selectedProductSku)?.Cost || "0").toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-zinc-400 uppercase font-bold text-[10px]">Cost per Carton</span>
-                    <span className="font-bold text-zinc-900">
-                      ${(parseFloat(productsList.find(p => p.SKU === selectedProductSku)?.Cost || "0") * parseInt(productsList.find(p => p.SKU === selectedProductSku)?.Carton || "24")).toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-              )}
-              <div className="flex gap-2 mt-2">
-                <CustomButton 
-                  type="submit"
-                  disabled={userRole === "viewer"}
-                  variant={sponsoredCatalogId ? "secondary" : "dark"}
-                  className="flex-1 h-10"
-                >
-                  {userRole === "viewer" ? "View Only" : sponsoredCatalogId ? "Update Catalog" : "Add to Catalog"}
-                </CustomButton>
-                {sponsoredCatalogId && (
-                  <CustomButton 
-                    type="button" 
-                    onClick={handleCancelCatalogEdit}
-                    variant="default"
-                    className="h-10"
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-tableFadeInOnly">
+            {/* Table col (left side) */}
+            <div className={`${isCatalogFormOpen ? "lg:col-span-2" : "lg:col-span-3"} overflow-hidden flex flex-col`}>
+              <DataTable
+                columns={catalogColumns}
+                data={catalogTableData}
+                userRole={userRole}
+                title="Sponsored Catalog Mappings"
+                fetching={fetching}
+                onEditRow={(row) => handleEditCatalog(row)}
+                onDeleteRow={(id) => handleDeleteCatalog(id)}
+                height="h-[calc(100vh-240px)]"
+                headerActions={
+                  <CustomButton
+                    variant={isCatalogFormOpen ? "dark" : "default"}
+                    onClick={() => setIsCatalogFormOpen(!isCatalogFormOpen)}
                   >
-                    Cancel
+                    {isCatalogFormOpen ? "Hide Panel" : "Add New Record"}
                   </CustomButton>
-                )}
-              </div>
-            </form>
-          </div>
- 
-          {/* Table col */}
-          <div className="lg:col-span-2 bg-white border border-zinc-300/40 rounded-xl shadow-sm overflow-hidden flex flex-col">
-            <div className="px-5 py-3.5 bg-zinc-50 border-b border-zinc-200">
-              <h4 className="font-bold text-zinc-800 text-sm">Sponsored Catalog Mappings</h4>
+                }
+              />
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-zinc-50 border-b border-zinc-200 text-zinc-500 font-bold uppercase tracking-wider">
-                    <th className="px-6 py-3">Sponsored By</th>
-                    <th className="px-6 py-3">Brand Owner</th>
-                    <th className="px-6 py-3">SKU</th>
-                    <th className="px-6 py-3">Product Name</th>
-                    <th className="px-6 py-3 text-center">UOM (Pcs/Ctn)</th>
-                    <th className="px-6 py-3 text-right">Cost/Pc</th>
-                    <th className="px-6 py-3 text-right">Cost/Ctn</th>
-                    <th className="px-6 py-3 text-center">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-200 text-zinc-700">
-                  {catalog.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="text-center p-8 italic text-zinc-400">
-                        No product sponsorships linked yet.
-                      </td>
-                    </tr>
-                  ) : (
-                    catalog.map((item) => (
-                      <tr key={item.id} className="hover:bg-zinc-50/50">
-                        <td className="px-6 py-4 font-bold text-zinc-900">{item.sponsoredBy || "-"}</td>
-                        <td className="px-6 py-4 font-bold text-zinc-900">{item.brandName}</td>
-                        <td className="px-6 py-4 font-mono">{item.sku}</td>
-                        <td className="px-6 py-4">{item.productName}</td>
-                        <td className="px-6 py-4 text-center font-bold">{item.uom}</td>
-                        <td className="px-6 py-4 text-right font-bold text-zinc-900">${item.cost.toFixed(2)}</td>
-                        <td className="px-6 py-4 text-right font-bold text-zinc-900">${(item.cost * item.uom).toFixed(2)}</td>
-                        <td className="px-6 py-4 text-center flex justify-center gap-2">
-                          {userRole !== "viewer" && (
-                            <Pencil 
-                              size={14} 
-                              onClick={() => handleEditCatalog(item)}
-                              className="text-zinc-400 hover:text-blue-600 cursor-pointer transition-colors"
-                            />
-                          )}
-                          {userRole === "admin" && (
-                            <Trash2 
-                              size={14} 
-                              onClick={() => handleDeleteCatalog(item.id)}
-                              className="text-zinc-400 hover:text-red-600 cursor-pointer transition-colors"
-                            />
-                          )}
-                        </td>
-                      </tr>
-                    ))
+
+            {/* Form col (right side, collapsible) */}
+            {isCatalogFormOpen && (
+              <div className="lg:col-span-1 bg-white border border-zinc-300/40 p-5 rounded-xl shadow-sm h-fit">
+                <h3 className="font-bold text-zinc-900 border-b pb-2 text-sm uppercase tracking-wider">
+                  {sponsoredCatalogId ? "Edit Sponsored Product" : "Add Sponsored Product"}
+                </h3>
+                <form onSubmit={handleAddCatalog} className="flex flex-col gap-4 mt-4 text-xs">
+                  <div>
+                    <label className="block mb-1 text-zinc-500 font-bold uppercase">Sponsored By</label>
+                    <input 
+                      type="text" 
+                      value={sponsoredBy}
+                      onChange={(e) => setSponsoredBy(e.target.value)}
+                      placeholder="e.g. HSG Global"
+                      required
+                      disabled={userRole === "viewer"}
+                      className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-zinc-500 font-bold uppercase">Brand Owner</label>
+                    <SearchableSelect
+                      options={brandOptions}
+                      value={selectedBrand}
+                      onChange={(val) => {
+                        setSelectedBrand(val);
+                        setSelectedProductSku("");
+                      }}
+                      placeholder="Search and select brand owner..."
+                      disabled={userRole === "viewer"}
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-zinc-500 font-bold uppercase">Product SKU</label>
+                    <SearchableSelect
+                      options={productOptions}
+                      value={selectedProductSku}
+                      onChange={(val) => setSelectedProductSku(val)}
+                      disabled={!selectedBrand || userRole === "viewer"}
+                      placeholder={selectedBrand ? "Search product SKU..." : "Select Brand first"}
+                    />
+                  </div>
+                  {selectedProductSku && (
+                    <div className="p-3 bg-zinc-50 rounded-lg border border-zinc-200/80 flex flex-col gap-2 font-medium">
+                      <div className="flex justify-between">
+                        <span className="text-zinc-400 uppercase font-bold text-[10px]">UOM (Pieces/Ctn)</span>
+                        <span className="font-bold text-zinc-900">
+                          {productsList.find(p => p.SKU === selectedProductSku)?.Carton || 24} pcs
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-zinc-400 uppercase font-bold text-[10px]">Cost per Piece</span>
+                        <span className="font-bold text-zinc-900">
+                          ${parseFloat(productsList.find(p => p.SKU === selectedProductSku)?.Cost || "0").toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-zinc-400 uppercase font-bold text-[10px]">Cost per Carton</span>
+                        <span className="font-bold text-zinc-900">
+                          ${(parseFloat(productsList.find(p => p.SKU === selectedProductSku)?.Cost || "0") * parseInt(productsList.find(p => p.SKU === selectedProductSku)?.Carton || "24")).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
                   )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 4. RECEIVER REGISTRY TAB */}
-      {activeTab === "receiver" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-tableFadeInOnly">
-          {/* Form col */}
-          <div className="bg-white border border-zinc-300/40 p-5 rounded-xl shadow-sm h-fit">
-            <h3 className="font-bold text-zinc-900 border-b pb-2 text-sm uppercase tracking-wider">
-              {recId ? "Edit Entity" : "Register Entity"}
-            </h3>
-            <form onSubmit={handleAddReceiver} className="flex flex-col gap-4 mt-4 text-xs">
-              <div>
-                <label className="block mb-1 text-zinc-500 font-bold uppercase">Entity Name</label>
-                <input 
-                  type="text" 
-                  value={recName}
-                  onChange={(e) => setRecName(e.target.value)}
-                  placeholder="e.g. Red Cross Charity"
-                  required
-                  disabled={userRole === "viewer"}
-                  className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
-                />
-              </div>
-              <div>
-                <label className="block mb-1 text-zinc-500 font-bold uppercase">Limit Type</label>
-                <select
-                  value={recType}
-                  onChange={(e) => setRecType(e.target.value as any)}
-                  required
-                  disabled={userRole === "viewer"}
-                  className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 font-semibold focus:outline-none focus:border-zinc-400"
-                >
-                  <option value="monthly">Monthly Limit</option>
-                  <option value="onetime">One-Time Take</option>
-                  <option value="open">Open (No Limit)</option>
-                </select>
-              </div>
-              {recType !== "open" && (
-                <div>
-                  <label className="block mb-1 text-zinc-500 font-bold uppercase">Limit (in Cartons)</label>
-                  <input 
-                    type="number" 
-                    value={recLimit}
-                    onChange={(e) => setRecLimit(e.target.value)}
-                    placeholder="Maximum cartons allowed"
-                    required
-                    min={1}
-                    disabled={userRole === "viewer"}
-                    className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
-                  />
-                  <p className="text-[10px] text-zinc-400 font-medium mt-1">
-                    Transactions are logged in pieces, but limits are tracked in cartons.
-                  </p>
-                </div>
-              )}
-              <div className="flex gap-2 mt-2">
-                <CustomButton 
-                  type="submit"
-                  disabled={userRole === "viewer"}
-                  variant={recId ? "secondary" : "dark"}
-                  className="flex-1 h-10"
-                >
-                  {userRole === "viewer" ? "View Only" : recId ? "Update Entity" : "Register Entity"}
-                </CustomButton>
-                {recId && (
-                  <CustomButton 
-                    type="button" 
-                    onClick={handleCancelReceiverEdit}
-                    variant="default"
-                    className="h-10"
-                  >
-                    Cancel
-                  </CustomButton>
-                )}
-              </div>
-            </form>
-          </div>
-
-          {/* Table col */}
-          <div className="lg:col-span-2 bg-white border border-zinc-300/40 rounded-xl shadow-sm overflow-hidden flex flex-col">
-            <div className="px-5 py-3.5 bg-zinc-50 border-b border-zinc-200">
-              <h4 className="font-bold text-zinc-800 text-sm">Receiver Registry and Statuses</h4>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-zinc-50 border-b border-zinc-200 text-zinc-500 font-bold uppercase tracking-wider">
-                    <th className="px-6 py-3">Entity Name</th>
-                    <th className="px-6 py-3">Limit Type</th>
-                    <th className="px-6 py-3 text-right">Limit (Ctns)</th>
-                    <th className="px-6 py-3 text-right">Given (Ctns)</th>
-                    <th className="px-6 py-3 text-right">Balance (Ctns)</th>
-                    <th className="px-6 py-3 text-center">Status</th>
-                    <th className="px-6 py-3 text-center">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-200 text-zinc-700">
-                  {receivers.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="text-center p-8 italic text-zinc-400">
-                        No receivers registered yet.
-                      </td>
-                    </tr>
-                  ) : (
-                    receivers.map((rec) => {
-                      const given = calculateGivenCartons(rec.id, rec.type);
-                      const isLimited = rec.type !== "open";
-                      const balance = isLimited ? (rec.limit! - given) : null;
-                      
-                      let statusBadge = "";
-                      if (isLimited) {
-                        if (balance! <= 0) {
-                          statusBadge = "bg-red-100 text-red-800 border-red-200";
-                        } else if (balance! <= (rec.limit! * 0.2)) {
-                          statusBadge = "bg-amber-100 text-amber-800 border-amber-200";
-                        } else {
-                          statusBadge = "bg-green-100 text-green-800 border-green-200";
-                        }
-                      } else {
-                        statusBadge = "bg-blue-100 text-blue-800 border-blue-200";
-                      }
-
-                      return (
-                        <tr key={rec.id} className="hover:bg-zinc-50/50">
-                          <td className="px-6 py-4 font-bold text-zinc-900">{rec.name}</td>
-                          <td className="px-6 py-4 uppercase font-semibold text-zinc-400 text-[10px] tracking-wider">
-                            {rec.type === "monthly" ? "Monthly" : rec.type === "onetime" ? "One-Time Take" : "Open"}
-                          </td>
-                          <td className="px-6 py-4 text-right font-bold">{isLimited ? rec.limit : "∞"}</td>
-                          <td className="px-6 py-4 text-right font-bold">{given.toFixed(1)}</td>
-                          <td className="px-6 py-4 text-right font-bold">{isLimited ? balance!.toFixed(1) : "∞"}</td>
-                          <td className="px-6 py-4 text-center">
-                            <span className={`px-2 py-0.5 text-[10px] font-bold rounded-md border ${statusBadge}`}>
-                              {isLimited ? (balance! <= 0 ? "Limit Reached" : balance! <= (rec.limit! * 0.2) ? "Near Limit" : "Active") : "Open"}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-center flex justify-center gap-2">
-                            {userRole !== "viewer" && (
-                              <Pencil 
-                                size={14} 
-                                onClick={() => handleEditReceiver(rec)}
-                                className="text-zinc-400 hover:text-blue-600 cursor-pointer transition-colors"
-                              />
-                            )}
-                            {userRole === "admin" && (
-                              <Trash2 
-                                size={14} 
-                                onClick={() => handleDeleteReceiver(rec.id)}
-                                className="text-zinc-400 hover:text-red-600 cursor-pointer transition-colors"
-                              />
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- CLAIM PRINT POPUP MODAL --- */}
-      {isPrintModalOpen && (
-        <div className="fixed inset-0 bg-zinc-950/60 flex items-center justify-center z-50 p-4 animate-tableFadeInOnly">
-          <div className="bg-white border border-zinc-200 w-full max-w-sm rounded-xl p-5 shadow-2xl flex flex-col gap-4 animate-modalSlideUp">
-            <div>
-              <h3 className="font-bold text-zinc-950 text-sm">Generate Claim Report</h3>
-              <p className="text-[11px] text-zinc-400 mt-0.5">Create a printable statement for the brand owner or sponsoring entity.</p>
-            </div>
-            <div>
-              <label className="block mb-1 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Report Filter Type</label>
-              <div className="flex gap-4 mb-2">
-                <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-zinc-700">
-                  <input
-                    type="radio"
-                    name="printFilterType"
-                    value="brand"
-                    checked={printFilterType === "brand"}
-                    onChange={() => {
-                      setPrintFilterType("brand");
-                      setPrintSponsorName("");
-                    }}
-                    className="accent-zinc-900"
-                  />
-                  Brand Owner
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-zinc-700">
-                  <input
-                    type="radio"
-                    name="printFilterType"
-                    value="sponsor"
-                    checked={printFilterType === "sponsor"}
-                    onChange={() => {
-                      setPrintFilterType("sponsor");
-                      setPrintBrandName("");
-                    }}
-                    className="accent-zinc-900"
-                  />
-                  Sponsor
-                </label>
-              </div>
-            </div>
-            {printFilterType === "brand" ? (
-              <div>
-                <label className="block mb-1 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Select Brand Owner</label>
-                <select
-                  value={printBrandName}
-                  onChange={(e) => setPrintBrandName(e.target.value)}
-                  className="w-full text-xs bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 font-bold focus:outline-none"
-                >
-                  <option value="">Select Brand</option>
-                  {uniqueCatalogBrands.map(name => (
-                    <option key={name} value={name}>{name}</option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              <div>
-                <label className="block mb-1 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Select Sponsor</label>
-                <select
-                  value={printSponsorName}
-                  onChange={(e) => setPrintSponsorName(e.target.value)}
-                  className="w-full text-xs bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 font-bold focus:outline-none"
-                >
-                  <option value="">Select Sponsor</option>
-                  {uniqueCatalogSponsors.map(name => (
-                    <option key={name} value={name}>{name}</option>
-                  ))}
-                </select>
+                  <div className="flex gap-2 mt-2">
+                    <CustomButton 
+                      type="submit"
+                      disabled={userRole === "viewer"}
+                      variant={sponsoredCatalogId ? "secondary" : "dark"}
+                      className="flex-1 h-10"
+                    >
+                      {userRole === "viewer" ? "View Only" : sponsoredCatalogId ? "Update Catalog" : "Add to Catalog"}
+                    </CustomButton>
+                    {sponsoredCatalogId && (
+                      <CustomButton 
+                        type="button" 
+                        onClick={handleCancelCatalogEdit}
+                        variant="default"
+                        className="h-10"
+                      >
+                        Cancel
+                      </CustomButton>
+                    )}
+                  </div>
+                </form>
               </div>
             )}
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block mb-1 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Start Date</label>
-                <input
-                  type="date"
-                  value={printStartDate}
-                  onChange={(e) => setPrintStartDate(e.target.value)}
-                  className="w-full text-xs bg-zinc-50 border border-zinc-300 rounded-lg p-2 text-zinc-900 font-bold focus:outline-none focus:border-zinc-400"
-                />
-              </div>
-              <div>
-                <label className="block mb-1 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">End Date</label>
-                <input
-                  type="date"
-                  value={printEndDate}
-                  onChange={(e) => setPrintEndDate(e.target.value)}
-                  className="w-full text-xs bg-zinc-50 border border-zinc-300 rounded-lg p-2 text-zinc-900 font-bold focus:outline-none focus:border-zinc-400"
-                />
-              </div>
-            </div>
-            <div className="flex gap-2 pt-2 border-t border-zinc-100 justify-end">
-              <CustomButton 
-                onClick={() => {
-                  setIsPrintModalOpen(false);
-                  setPrintBrandName("");
-                  setPrintSponsorName("");
-                  setPrintStartDate("");
-                  setPrintEndDate("");
-                }}
-                variant="default"
-                className="h-10"
-              >
-                Cancel
-              </CustomButton>
-              <CustomButton 
-                onClick={handlePrintClaim}
-                disabled={printFilterType === "brand" ? !printBrandName : !printSponsorName}
-                variant="dark"
-                className="h-10"
-              >
-                Print Report
-              </CustomButton>
-            </div>
           </div>
         </div>
       )}
+      {/* 4. RECEIVER REGISTRY TAB */}
+      {activeTab === "receiver" && (
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-tableFadeInOnly">
+            {/* Table col (left side) */}
+            <div className={`${isReceiverFormOpen ? "lg:col-span-2" : "lg:col-span-3"} overflow-hidden flex flex-col`}>
+              <DataTable
+                columns={receiverColumns}
+                data={receiversTableData}
+                userRole={userRole}
+                title="Receiver Registry and Statuses"
+                fetching={fetching}
+                onEditRow={(row) => handleEditReceiver(row)}
+                onDeleteRow={(id) => handleDeleteReceiver(id)}
+                height="h-[calc(100vh-240px)]"
+                headerActions={
+                  <CustomButton
+                    variant={isReceiverFormOpen ? "dark" : "default"}
+                    onClick={() => setIsReceiverFormOpen(!isReceiverFormOpen)}
+                  >
+                    {isReceiverFormOpen ? "Hide Panel" : "Add New Record"}
+                  </CustomButton>
+                }
+              />
+            </div>
+
+            {/* Form col (right side, collapsible) */}
+            {isReceiverFormOpen && (
+              <div className="lg:col-span-1 bg-white border border-zinc-300/40 p-5 rounded-xl shadow-sm h-fit">
+                <h3 className="font-bold text-zinc-900 border-b pb-2 text-sm uppercase tracking-wider">
+                  {recId ? "Edit Entity" : "Register Entity"}
+                </h3>
+                <form onSubmit={handleAddReceiver} className="flex flex-col gap-4 mt-4 text-xs">
+                  <div>
+                    <label className="block mb-1 text-zinc-500 font-bold uppercase">Entity Name</label>
+                    <input 
+                      type="text" 
+                      value={recName}
+                      onChange={(e) => setRecName(e.target.value)}
+                      placeholder="e.g. Red Cross Charity"
+                      required
+                      disabled={userRole === "viewer"}
+                      className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-zinc-500 font-bold uppercase">Limit Type</label>
+                    <select
+                      value={recType}
+                      onChange={(e) => setRecType(e.target.value as any)}
+                      required
+                      disabled={userRole === "viewer"}
+                      className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 font-semibold focus:outline-none focus:border-zinc-400"
+                    >
+                      <option value="monthly">Monthly Limit</option>
+                      <option value="onetime">One-Time Take</option>
+                      <option value="open">Open (No Limit)</option>
+                    </select>
+                  </div>
+                  {recType !== "open" && (
+                    <div>
+                      <label className="block mb-1 text-zinc-500 font-bold uppercase">Limit (in Cartons)</label>
+                      <input 
+                        type="number" 
+                        value={recLimit}
+                        onChange={(e) => setRecLimit(e.target.value)}
+                        placeholder="Maximum cartons allowed"
+                        required
+                        min={1}
+                        disabled={userRole === "viewer"}
+                        className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
+                      />
+                      <p className="text-[10px] text-zinc-400 font-medium mt-1">
+                        Transactions are logged in pieces, but limits are tracked in cartons.
+                      </p>
+                    </div>
+                  )}
+                  <div className="flex gap-2 mt-2">
+                    <CustomButton 
+                      type="submit"
+                      disabled={userRole === "viewer"}
+                      variant={recId ? "secondary" : "dark"}
+                      className="flex-1 h-10"
+                    >
+                      {userRole === "viewer" ? "View Only" : recId ? "Update Entity" : "Register Entity"}
+                    </CustomButton>
+                    {recId && (
+                      <CustomButton 
+                        type="button" 
+                        onClick={handleCancelReceiverEdit}
+                        variant="default"
+                        className="h-10"
+                      >
+                        Cancel
+                      </CustomButton>
+                    )}
+                  </div>
+                </form>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+
 
     </div>
   );

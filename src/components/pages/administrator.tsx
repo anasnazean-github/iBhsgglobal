@@ -52,7 +52,7 @@ export function AdministratorPage({ profile, idToken }: AdministratorPageProps) 
       case "Users":
         return <UsersModule idToken={idToken} profile={profile} />;
       case "Setting":
-        return <SettingModule profile={profile} />;
+        return <SettingModule profile={profile} idToken={idToken} />;
       default:
         return null;
     }

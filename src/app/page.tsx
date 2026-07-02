@@ -7,7 +7,7 @@ import { menuConfig } from "@/config/menu-config";
 import { ToastContainer } from "@/components/toast-container";
 import { auth, googleProvider, signInWithPopup, signOut } from "@/lib/firebase";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { syncUserProfile, fetchMyProfile, UserProfile } from "@/lib/api";
+import { syncUserProfile, fetchMyProfile, fetchLatestContract, UserProfile } from "@/lib/api";
 import { showToast } from "@/lib/toast";
 import { CustomButton } from "@/components/custom-button";
 import { ShieldAlert } from "lucide-react";
@@ -29,6 +29,19 @@ export default function Home() {
     email: string;
     name: string;
   } | null>(null);
+
+  const [latestContractUpdatedAt, setLatestContractUpdatedAt] = React.useState<number>(0);
+
+  // Load latest contract version to enforce re-signing
+  React.useEffect(() => {
+    fetchLatestContract()
+      .then((contract) => {
+        if (contract && contract.updated_at) {
+          setLatestContractUpdatedAt(contract.updated_at);
+        }
+      })
+      .catch((e) => console.error("Failed to load latest contract details:", e));
+  }, []);
 
   // Listen to Firebase Auth state changes
   React.useEffect(() => {
@@ -328,8 +341,14 @@ export default function Home() {
       );
     }
 
-    // 3. Welcome Aboard Onboarding Lock Screen (First Sign In)
-    if (profile.email !== "hsgglobalpteltd@gmail.com" && (profile.phone_number === null || profile.phone_number === "")) {
+    // 3. Welcome Aboard Onboarding Lock Screen (First Sign In or New Contract Version)
+    const needsToSignContract = 
+      profile.email !== "hsgglobalpteltd@gmail.com" && (
+        !profile.contract_signed_at || 
+        (latestContractUpdatedAt > 0 && profile.contract_signed_at < latestContractUpdatedAt)
+      );
+
+    if (needsToSignContract) {
       return (
         <WelcomeAboardScreen 
           profile={profile} 
@@ -371,7 +390,7 @@ export default function Home() {
             </div>
             <div className="flex flex-col gap-1.5">
               <h2 className="text-xl font-bold text-zinc-950">Pending Approval</h2>
-              <p className="text-sm text-zinc-500">Please contact admin for manual approval.</p>
+              <p className="text-sm text-zinc-500">Please contact admin for approval.</p>
             </div>
             <div className="w-full border-t border-zinc-300/60 my-1" />
             <CustomButton onClick={handleLogout} variant="default" className="w-full h-10 text-sm">

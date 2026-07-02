@@ -10,6 +10,9 @@ export interface UserProfile {
   pages_access: string[]; // parsed JSON array
   modules_access: string[]; // parsed JSON array
   active: number; // 0 = inactive, 1 = active
+  contract_signature_base64?: string | null;
+  contract_pdf_link?: string | null;
+  contract_signed_at?: number | null;
 }
 
 const WORKER_URL = "https://ib.hsgglobalpteltd.workers.dev";
@@ -42,15 +45,16 @@ function getSessionIdHeader(): Record<string, string> {
 async function handleResponse(res: Response, errorPrefix: string): Promise<any> {
   if (!res.ok) {
     let errBody: any = null;
+    let errText = "";
     try {
-      errBody = await res.json();
+      errText = await res.text();
+      errBody = JSON.parse(errText);
     } catch {}
     if (errBody && errBody.error) {
-      const err = new Error(errBody.message || `${errorPrefix} failed: ${res.statusText}`);
+      const err = new Error(errBody.message || errBody.error || `${errorPrefix} failed: ${res.statusText}`);
       (err as any).code = errBody.error;
       throw err;
     }
-    const errText = await res.text();
     throw new Error(`${errorPrefix} failed: ${errText || res.statusText}`);
   }
   return res.json();
@@ -182,6 +186,127 @@ export async function adminUpdateUser(
     }),
   });
   const data = await handleResponse(res, "Update user");
+  return {
+    ...data,
+    pages_access: safeParseAccess(data.pages_access),
+    modules_access: safeParseAccess(data.modules_access),
+  };
+}
+
+// 6. DELETE USER (Admin only)
+export async function adminDeleteUser(
+  idToken: string,
+  requestorEmail: string,
+  targetEmail: string
+): Promise<{ success: boolean; email: string }> {
+  const token = await getFreshToken(idToken);
+  const res = await fetch(`${WORKER_URL}/api/users/delete`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+      ...getSessionIdHeader(),
+    },
+    body: JSON.stringify({ email: targetEmail }),
+  });
+  return handleResponse(res, "Delete user");
+}
+
+// 7. CONTRACT APIs
+export async function fetchLatestContract(): Promise<{ text: string; updated_at: number }> {
+  const res = await fetch(`${WORKER_URL}/api/contract/latest`, {
+    method: "GET",
+  });
+  return handleResponse(res, "Retrieve latest contract");
+}
+
+export async function adminUpdateContract(idToken: string, text: string): Promise<{ success: boolean; updated_at: number }> {
+  const token = await getFreshToken(idToken);
+  const res = await fetch(`${WORKER_URL}/api/contract/update`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+      ...getSessionIdHeader(),
+    },
+    body: JSON.stringify({ text }),
+  });
+  return handleResponse(res, "Update contract");
+}
+
+export async function startSigningSession(email: string): Promise<{ session_id: string }> {
+  const res = await fetch(`${WORKER_URL}/api/contract/start-session`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email }),
+  });
+  return handleResponse(res, "Start signing session");
+}
+
+export async function pollSigningSession(sessionId: string): Promise<{
+  session_id: string;
+  email: string;
+  status: string;
+  name?: string;
+  phone?: string;
+  signature_data?: string;
+}> {
+  const res = await fetch(`${WORKER_URL}/api/contract/session-status?sessionId=${encodeURIComponent(sessionId)}`, {
+    method: "GET",
+  });
+  return handleResponse(res, "Poll signing status");
+}
+
+export async function submitMobileSignature(
+  sessionId: string,
+  name: string,
+  phone: string,
+  signatureData: string
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${WORKER_URL}/api/contract/submit-signature`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      session_id: sessionId,
+      name,
+      phone,
+      signature_data: signatureData,
+    }),
+  });
+  return handleResponse(res, "Submit signature");
+}
+
+export async function finalizeContractSignature(
+  idToken: string,
+  email: string,
+  name: string,
+  phone: string,
+  signatureBase64: string,
+  pdfLink: string,
+  signedAt: number
+): Promise<UserProfile> {
+  const token = await getFreshToken(idToken);
+  const res = await fetch(`${WORKER_URL}/api/contract/finalize`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+      ...getSessionIdHeader(),
+    },
+    body: JSON.stringify({
+      email,
+      name,
+      phone_number: phone,
+      signature_base64: signatureBase64,
+      pdf_link: pdfLink,
+      signed_at: signedAt,
+    }),
+  });
+  const data = await handleResponse(res, "Finalize contract signing");
   return {
     ...data,
     pages_access: safeParseAccess(data.pages_access),

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { DataTable, Column } from "../data-table";
-import { fetchAllUsers, UserProfile, adminUpdateUser } from "@/lib/api";
+import { fetchAllUsers, UserProfile, adminUpdateUser, adminDeleteUser } from "@/lib/api";
 import { showToast } from "@/lib/toast";
 import { EditUserModal } from "../edit-user-modal";
 import { NavigationTabs } from "../navigation-tabs";
@@ -81,6 +81,48 @@ export function UsersModule({ idToken = "simulated-id-token", profile }: UsersMo
     }
   };
 
+  const handleDeleteUser = async (targetEmail: string) => {
+    try {
+      const myEmail = profile?.email || "admin@hsg-global.com";
+      if (targetEmail === myEmail) {
+        showToast("Cannot delete your own administrator account", "error");
+        return;
+      }
+      await adminDeleteUser(idToken, myEmail, targetEmail);
+      showToast(`User ${targetEmail} deleted successfully!`, "success");
+      loadUsers(true); // silent background load
+    } catch (err: any) {
+      showToast(err.message || "Failed to delete user", "error");
+      loadUsers(true);
+      throw err;
+    }
+  };
+
+  const handleBlockUser = async (targetUser: any) => {
+    try {
+      const myEmail = profile?.email || "admin@hsg-global.com";
+      if (targetUser.email === myEmail) {
+        showToast("Cannot block your own administrator account", "error");
+        return;
+      }
+      await adminUpdateUser(
+        idToken,
+        myEmail,
+        targetUser.email,
+        targetUser.role,
+        targetUser.pages_access || [],
+        targetUser.modules_access || [],
+        2, // active = 2 (Blocked)
+        targetUser.name,
+        targetUser.phone_number
+      );
+      showToast(`User ${targetUser.email} blocked successfully!`, "success");
+      loadUsers(true); // silent background load
+    } catch (err: any) {
+      showToast(err.message || "Failed to block user", "error");
+    }
+  };
+
   if (profile?.role !== "Administrator") {
     return (
       <div className="flex flex-col items-center justify-center p-8 bg-[#E5E5E5] border border-zinc-300 rounded-lg shadow-sm font-primary">
@@ -124,6 +166,8 @@ export function UsersModule({ idToken = "simulated-id-token", profile }: UsersMo
           title={`${activeTab} Database Registry`}
           fetching={fetching}
           onEditRow={(row) => setEditingUser(row)}
+          onDeleteRow={activeTab === "Block" ? handleDeleteUser : undefined}
+          onBlockRow={activeTab === "Users" ? handleBlockUser : undefined}
           height="h-[calc(100vh-220px)]"
         />
       </div>

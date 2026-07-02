@@ -6,10 +6,13 @@ import { showToast } from "@/lib/toast";
 import { NavigationTabs } from "../navigation-tabs";
 import { CustomButton } from "../custom-button";
 
+import { fetchLatestContract, adminUpdateContract } from "@/lib/api";
+
 interface SettingModuleProps {
   profile?: {
     role: string;
   } | null;
+  idToken?: string;
 }
 
 const apiColumns: Column[] = [
@@ -18,7 +21,7 @@ const apiColumns: Column[] = [
   { id: "Key", header: "API Key", accessor: "Key" }
 ];
 
-export function SettingModule({ profile }: SettingModuleProps) {
+export function SettingModule({ profile, idToken }: SettingModuleProps) {
   const tabs = [
     { id: "configuration", label: "Configuration", desc: "System parameters and configurations." },
     { id: "api", label: "API", desc: "Manage API integrations and secure credentials." }
@@ -29,6 +32,71 @@ export function SettingModule({ profile }: SettingModuleProps) {
   const [fetching, setFetching] = React.useState(false);
   const [isEditMode, setIsEditMode] = React.useState(false);
   const [editingApi, setEditingApi] = React.useState<any | null>(null);
+
+  // Contract upload states
+  const [contractText, setContractText] = React.useState<string>("");
+  const [contractUpdatedAt, setContractUpdatedAt] = React.useState<number>(0);
+  const [selectedFileContent, setSelectedFileContent] = React.useState<string>("");
+  const [fileName, setFileName] = React.useState<string>("");
+  const [uploadingContract, setUploadingContract] = React.useState<boolean>(false);
+
+  const loadContract = React.useCallback(async () => {
+    try {
+      const contract = await fetchLatestContract();
+      setContractText(contract.text || "");
+      setContractUpdatedAt(contract.updated_at || 0);
+    } catch (err: any) {
+      console.error("Failed to load contract:", err);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (activeTab === "configuration") {
+      loadContract();
+    }
+  }, [activeTab, loadContract]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== "text/plain" && !file.name.endsWith(".txt")) {
+      showToast("Only .txt files are allowed", "error");
+      return;
+    }
+
+    setFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      setSelectedFileContent(text || "");
+    };
+    reader.readAsText(file);
+  };
+
+  const handleUpdateContract = async () => {
+    if (!selectedFileContent.trim()) {
+      showToast("Please upload a valid .txt file first", "warning");
+      return;
+    }
+
+    setUploadingContract(true);
+    try {
+      const myToken = idToken || "simulated-id-token";
+      const res = await adminUpdateContract(myToken, selectedFileContent);
+      if (res.success) {
+        showToast("Contract updated successfully! All users will be prompted to sign this new contract.", "success");
+        setContractText(selectedFileContent);
+        setContractUpdatedAt(res.updated_at);
+        setSelectedFileContent("");
+        setFileName("");
+      }
+    } catch (err: any) {
+      showToast(err.message || "Failed to update contract", "error");
+    } finally {
+      setUploadingContract(false);
+    }
+  };
 
   const fetchFreshData = async (forceSync = false) => {
     setFetching(true);
@@ -231,10 +299,62 @@ export function SettingModule({ profile }: SettingModuleProps) {
 
       <div className="w-full">
         {activeTab === "configuration" ? (
-          <div className="flex flex-col items-center justify-center h-48 bg-[#E5E5E5] border border-dashed border-zinc-350 rounded-lg select-none p-6 text-center">
-            <span className="text-zinc-500 text-sm font-semibold italic">
-              Configuration database registry. No configuration parameters set yet.
-            </span>
+          <div className="flex flex-col gap-6 bg-[#E5E5E5] border border-zinc-300 rounded-lg p-6 shadow-sm">
+            <div className="flex flex-col gap-1 border-b border-zinc-300 pb-4">
+              <h3 className="text-lg font-bold text-zinc-900">Sign-Up Contract Management</h3>
+              <p className="text-xs text-zinc-500">
+                Upload a new plain text contract (.txt file). When updated, all users will be prompted to read and sign it on their next login.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Left Column: Current Contract View */}
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Active Contract Preview</label>
+                <div className="flex-1 min-h-[250px] max-h-[350px] overflow-y-auto bg-zinc-50 border border-zinc-300 rounded-lg p-4 text-xs leading-relaxed text-zinc-700 whitespace-pre-wrap select-text custom-scrollbar">
+                  {contractText || "No active contract uploaded yet. Fallback standard agreement is being used."}
+                </div>
+                {contractUpdatedAt > 0 && (
+                  <span className="text-[10px] text-zinc-500 italic font-medium">
+                    Last updated: {new Date(contractUpdatedAt).toLocaleDateString("en-GB")} {new Date(contractUpdatedAt).toLocaleTimeString([], { hour12: false })}
+                  </span>
+                )}
+              </div>
+
+              {/* Right Column: Upload Panel */}
+              <div className="flex flex-col gap-4 bg-[#EEEEEE] border border-zinc-300 rounded-lg p-5">
+                <h4 className="text-sm font-bold text-zinc-800">Publish New Contract</h4>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Choose Plain Text (.txt) File</label>
+                  <input
+                    type="file"
+                    accept=".txt"
+                    onChange={handleFileChange}
+                    className="w-full text-xs text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-[#E5E5E5] file:text-zinc-700 hover:file:bg-[#EEEEEE] file:cursor-pointer"
+                  />
+                </div>
+
+                {fileName && (
+                  <div className="flex flex-col gap-1 bg-zinc-50 border border-zinc-200 rounded p-3">
+                    <span className="text-xs font-bold text-zinc-700 truncate">Selected: {fileName}</span>
+                    <span className="text-[10px] text-zinc-500">Previewing first 200 characters:</span>
+                    <p className="text-[10px] text-zinc-650 italic truncate bg-[#EEEEEE] p-1.5 rounded border border-zinc-200 mt-1">
+                      {selectedFileContent.substring(0, 200)}...
+                    </p>
+                  </div>
+                )}
+
+                <CustomButton
+                  type="button"
+                  variant="dark"
+                  onClick={handleUpdateContract}
+                  disabled={!selectedFileContent || uploadingContract}
+                  className="w-full h-10 text-xs mt-2"
+                >
+                  {uploadingContract ? "Updating Contract..." : "Update Contract (Force Re-sign)"}
+                </CustomButton>
+              </div>
+            </div>
           </div>
         ) : (
           <DataTable
