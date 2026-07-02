@@ -36,7 +36,7 @@ The iB is exclusively an operational tool. It does not require, request, or acce
 
 export function WelcomeAboardScreen({ profile, idToken, onLogout, onComplete }: WelcomeAboardScreenProps) {
   const [contractText, setContractText] = React.useState(FALLBACK_CONTRACT_TEXT);
-  const [scrolledToBottom, setScrolledToBottom] = React.useState(false);
+  const [scrolledToBottom, setScrolledToBottom] = React.useState(true);
   const [loading, setLoading] = React.useState(false);
   const [finalizing, setFinalizing] = React.useState(false);
 
@@ -268,9 +268,7 @@ export function WelcomeAboardScreen({ profile, idToken, onLogout, onComplete }: 
           </button>
         </div>
 
-        {/* Scrollable NDA Text */}
         <div 
-          onScroll={handleScroll}
           className="w-full p-8 overflow-y-auto custom-scrollbar bg-zinc-50 text-zinc-700 text-xs leading-relaxed border-b border-zinc-300 whitespace-pre-wrap font-primary select-text h-[calc(90vh-136px)]"
         >
           {contractText}
@@ -279,13 +277,7 @@ export function WelcomeAboardScreen({ profile, idToken, onLogout, onComplete }: 
         {/* Bottom Actions Bar */}
         <div className="flex items-center justify-between gap-4 px-6 py-4 bg-[#EEEEEE] border-t border-zinc-300 rounded-b-lg">
           <span className="text-[10px] text-zinc-500 font-bold shrink-0">
-            {scrolledToBottom ? (
-              <span className="text-emerald-700 flex items-center gap-1">
-                <Check size={13} className="stroke-[3]" /> Scroll Verification Completed
-              </span>
-            ) : (
-              <span>Please scroll to the bottom of the NDA to unlock signing</span>
-            )}
+            Please click "Sign Contract" to generate your signature QR code.
           </span>
           
           <div className="flex items-center gap-3">
