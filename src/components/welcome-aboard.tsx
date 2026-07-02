@@ -242,6 +242,9 @@ export function WelcomeAboardScreen({ profile, idToken, onLogout, onComplete }: 
   return (
     <div className="flex min-h-screen w-full flex-col items-center justify-center bg-[#EEEEEE] p-6 font-primary animate-fade-in">
       <style>{`
+        .custom-scrollbar {
+          -webkit-overflow-scrolling: touch;
+        }
         .custom-scrollbar::-webkit-scrollbar {
           width: 8px;
           display: block;
@@ -260,7 +263,7 @@ export function WelcomeAboardScreen({ profile, idToken, onLogout, onComplete }: 
         }
       `}</style>
 
-      <div className="w-full max-w-3xl bg-[#E5E5E5] border border-zinc-300 rounded-lg shadow-lg flex flex-col max-h-[90vh]">
+      <div className="w-full max-w-3xl bg-[#E5E5E5] border border-zinc-300 rounded-lg shadow-lg flex flex-col h-[90vh] max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-300 bg-[#EEEEEE] rounded-t-lg">
           <div className="flex items-center gap-2.5">
@@ -284,7 +287,7 @@ export function WelcomeAboardScreen({ profile, idToken, onLogout, onComplete }: 
         {/* Scrollable NDA Text */}
         <div 
           onScroll={handleScroll}
-          className="flex-1 min-h-0 p-8 overflow-y-scroll custom-scrollbar bg-zinc-50 text-zinc-700 text-xs leading-relaxed border-b border-zinc-300 whitespace-pre-wrap font-primary select-text"
+          className="flex-1 min-h-0 p-8 overflow-y-auto custom-scrollbar bg-zinc-50 text-zinc-700 text-xs leading-relaxed border-b border-zinc-300 whitespace-pre-wrap font-primary select-text"
         >
           {contractText}
         </div>
