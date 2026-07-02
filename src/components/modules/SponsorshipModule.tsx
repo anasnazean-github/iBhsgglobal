@@ -136,6 +136,13 @@ function SearchableSelect({ options, value, onChange, placeholder, disabled = fa
 }
 
 export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
+  const userRole = React.useMemo(() => {
+    const role = profile?.role;
+    if (role === "Administrator" || role === "Manager") return "admin";
+    if (role === "Operator" || role === "Operation") return "operator";
+    return "viewer";
+  }, [profile]);
+
   const tabs = [
     { id: "dashboard", label: "Dashboard", desc: "Overview of sponsorship distribution." },
     { id: "transaction", label: "Transaction", desc: "Record and manage distribution outputs." },
@@ -377,6 +384,10 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
 
   const handleAddCatalog = (e: React.FormEvent) => {
     e.preventDefault();
+    if (userRole === "viewer") {
+      showToast("Access Denied: Viewers cannot modify the catalog.", "error");
+      return;
+    }
     if (!selectedBrand || !selectedProductSku) {
       showToast("Please select a brand owner and sponsored product SKU.", "error");
       return;
@@ -439,6 +450,10 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
   };
 
   const handleDeleteCatalog = (id: string) => {
+    if (userRole !== "admin") {
+      showToast("Access Denied: Only Admins can delete catalog links.", "error");
+      return;
+    }
     const isUsed = transactions.some(t => t.skuId === id);
     if (isUsed) {
       showToast("Cannot remove product. It is referenced in distribution history.", "error");
@@ -489,6 +504,10 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
 
   const handleAddReceiver = (e: React.FormEvent) => {
     e.preventDefault();
+    if (userRole === "viewer") {
+      showToast("Access Denied: Viewers cannot register receivers.", "error");
+      return;
+    }
     if (!recName.trim()) {
       showToast("Please enter an entity name.", "error");
       return;
@@ -537,6 +556,10 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
   };
 
   const handleDeleteReceiver = (id: string) => {
+    if (userRole !== "admin") {
+      showToast("Access Denied: Only Admins can delete receivers.", "error");
+      return;
+    }
     const isUsed = transactions.some(t => t.receiverId === id);
     if (isUsed) {
       showToast("Cannot remove receiver. Transactions are logged under this entity.", "error");
@@ -648,6 +671,10 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
 
   const handleTransactionSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (userRole === "viewer") {
+      showToast("Access Denied: Viewers cannot record transactions.", "error");
+      return;
+    }
     if (!txRef.trim() || !txDate || !txReceiverId || txItems.length === 0) {
       showToast("Please fill in Ref, Date, Receiver and add at least one SKU.", "error");
       return;
@@ -753,6 +780,10 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
   };
 
   const handleEditTransaction = (id: string) => {
+    if (userRole === "viewer") {
+      showToast("Access Denied: Viewers cannot edit transactions.", "error");
+      return;
+    }
     const tx = transactions.find(t => t.id === id);
     if (!tx) return;
 
@@ -768,6 +799,10 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
   };
 
   const handleDeleteTransaction = (id: string) => {
+    if (userRole !== "admin") {
+      showToast("Access Denied: Only Admins can delete transactions.", "error");
+      return;
+    }
     // --- INSTANT FRONTEND UPDATE ---
     const updated = transactions.filter(t => t.id !== id);
     setTransactions(updated);
@@ -1268,6 +1303,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                     onChange={(e) => setTxRef(e.target.value)}
                     placeholder="e.g. DOC-8823"
                     required
+                    disabled={userRole === "viewer"}
                     className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
                   />
                 </div>
@@ -1278,6 +1314,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                     value={txDate}
                     onChange={(e) => setTxDate(e.target.value)}
                     required
+                    disabled={userRole === "viewer"}
                     className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
                   />
                 </div>
@@ -1289,6 +1326,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                   value={txReceiverId}
                   onChange={(val) => setTxReceiverId(val)}
                   placeholder="Search and select receiver..."
+                  disabled={userRole === "viewer"}
                 />
                 {txReceiverId && (
                   <p className={`text-[10px] mt-1.5 font-bold ${currentBalanceStatus.warningClass || "text-zinc-500"}`}>
@@ -1300,7 +1338,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
               {/* SKU Items List section */}
               <div className="border border-zinc-200 rounded-lg p-3 bg-zinc-50/50 mt-1 flex flex-col gap-3">
                 <span className="font-bold text-[10px] text-zinc-400 uppercase tracking-wider block">Add SKUs to Transaction</span>
-                 <div className="flex gap-2 items-end">
+                <div className="flex gap-2 items-end">
                   <div className="flex-1">
                     <label className="block mb-1 text-[10px] text-zinc-500 font-semibold uppercase">Sku</label>
                     <SearchableSelect
@@ -1308,6 +1346,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                       value={txSkuId}
                       onChange={(val) => setTxSkuId(val)}
                       placeholder="Search SKU..."
+                      disabled={userRole === "viewer"}
                     />
                   </div>
                   <div className="w-24">
@@ -1318,14 +1357,17 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                       onChange={(e) => setTxQty(e.target.value)}
                       placeholder="Pcs"
                       min={1}
+                      disabled={userRole === "viewer"}
                       className="w-full h-8 bg-white border border-zinc-300 rounded-lg px-2 text-zinc-900 focus:outline-none text-xs"
                     />
                   </div>
-                  <Plus 
-                    size={20} 
-                    onClick={handleAddItemToList}
-                    className="cursor-pointer text-zinc-500 hover:text-zinc-900 transition-colors flex-shrink-0 mb-1.5"
-                  />
+                  {userRole !== "viewer" && (
+                    <Plus 
+                      size={20} 
+                      onClick={handleAddItemToList}
+                      className="cursor-pointer text-zinc-500 hover:text-zinc-900 transition-colors flex-shrink-0 mb-1.5"
+                    />
+                  )}
                 </div>
 
                 {txItems.length > 0 && (
@@ -1341,14 +1383,16 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                             <span className="font-bold text-zinc-900">{code}</span>
                             <span className="text-zinc-500 ml-1.5">({item.qtyPcs} pcs / ${totalAmount.toFixed(2)})</span>
                           </div>
-                          <Trash2 
-                            size={14} 
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setTxItems(prev => prev.filter((_, i) => i !== idx));
-                            }}
-                            className="text-zinc-400 hover:text-red-600 cursor-pointer flex-shrink-0 transition-colors"
-                          />
+                          {userRole !== "viewer" && (
+                            <Trash2 
+                              size={14} 
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setTxItems(prev => prev.filter((_, i) => i !== idx));
+                              }}
+                              className="text-zinc-400 hover:text-red-600 cursor-pointer flex-shrink-0 transition-colors"
+                            />
+                          )}
                         </div>
                       );
                     })}
@@ -1363,17 +1407,18 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                   value={txRemark}
                   onChange={(e) => setTxRemark(e.target.value)}
                   placeholder="Optional notes"
+                  disabled={userRole === "viewer"}
                   className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold resize-none text-xs"
                 />
               </div>
               <div className="flex gap-2 mt-2">
                 <CustomButton 
                   type="submit"
-                  disabled={txItems.length === 0}
+                  disabled={txItems.length === 0 || userRole === "viewer"}
                   variant={txId ? "secondary" : "dark"}
                   className="flex-1 h-10"
                 >
-                  {txId ? "Update Entry" : "Record Entry"}
+                  {userRole === "viewer" ? "View Only" : txId ? "Update Entry" : "Record Entry"}
                 </CustomButton>
                 {txId && (
                   <CustomButton 
@@ -1433,16 +1478,20 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                             <td className="px-4 py-3 text-right font-bold text-zinc-900">${totalAmount.toFixed(2)}</td>
                             <td className="px-4 py-3 truncate max-w-xs">{tx.remark}</td>
                             <td className="px-4 py-3 text-center flex justify-center gap-2">
-                              <Pencil 
-                                size={14} 
-                                onClick={() => handleEditTransaction(tx.id)}
-                                className="text-zinc-400 hover:text-blue-600 cursor-pointer transition-colors"
-                              />
-                              <Trash2 
-                                size={14} 
-                                onClick={() => handleDeleteTransaction(tx.id)}
-                                className="text-zinc-400 hover:text-red-600 cursor-pointer transition-colors"
-                              />
+                              {userRole !== "viewer" && (
+                                <Pencil 
+                                  size={14} 
+                                  onClick={() => handleEditTransaction(tx.id)}
+                                  className="text-zinc-400 hover:text-blue-600 cursor-pointer transition-colors"
+                                />
+                              )}
+                              {userRole === "admin" && (
+                                <Trash2 
+                                  size={14} 
+                                  onClick={() => handleDeleteTransaction(tx.id)}
+                                  className="text-zinc-400 hover:text-red-600 cursor-pointer transition-colors"
+                                />
+                              )}
                             </td>
                           </tr>
                         );
@@ -1474,6 +1523,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                     setSelectedProductSku("");
                   }}
                   placeholder="Search and select brand owner..."
+                  disabled={userRole === "viewer"}
                 />
               </div>
               <div>
@@ -1482,7 +1532,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                   options={productOptions}
                   value={selectedProductSku}
                   onChange={(val) => setSelectedProductSku(val)}
-                  disabled={!selectedBrand}
+                  disabled={!selectedBrand || userRole === "viewer"}
                   placeholder={selectedBrand ? "Search product SKU..." : "Select Brand first"}
                 />
               </div>
@@ -1510,10 +1560,11 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
               )}
               <CustomButton 
                 type="submit"
+                disabled={userRole === "viewer"}
                 variant="dark"
                 className="w-full mt-2 h-10"
               >
-                Add to Catalog
+                {userRole === "viewer" ? "View Only" : "Add to Catalog"}
               </CustomButton>
             </form>
           </div>
@@ -1553,11 +1604,13 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                         <td className="px-6 py-4 text-right font-bold text-zinc-900">${item.cost.toFixed(2)}</td>
                         <td className="px-6 py-4 text-right font-bold text-zinc-900">${(item.cost * item.uom).toFixed(2)}</td>
                         <td className="px-6 py-4 text-center flex justify-center">
-                          <Trash2 
-                            size={14} 
-                            onClick={() => handleDeleteCatalog(item.id)}
-                            className="text-zinc-400 hover:text-red-600 cursor-pointer transition-colors"
-                          />
+                          {userRole === "admin" && (
+                            <Trash2 
+                              size={14} 
+                              onClick={() => handleDeleteCatalog(item.id)}
+                              className="text-zinc-400 hover:text-red-600 cursor-pointer transition-colors"
+                            />
+                          )}
                         </td>
                       </tr>
                     ))
@@ -1586,6 +1639,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                   onChange={(e) => setRecName(e.target.value)}
                   placeholder="e.g. Red Cross Charity"
                   required
+                  disabled={userRole === "viewer"}
                   className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
                 />
               </div>
@@ -1595,10 +1649,11 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                   value={recType}
                   onChange={(e) => setRecType(e.target.value as any)}
                   required
+                  disabled={userRole === "viewer"}
                   className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 font-semibold focus:outline-none focus:border-zinc-400"
                 >
                   <option value="monthly">Monthly Limit</option>
-                  <option value="onetime">One-Time Limit</option>
+                  <option value="onetime">One-Time Take</option>
                   <option value="open">Open (No Limit)</option>
                 </select>
               </div>
@@ -1612,6 +1667,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                     placeholder="Maximum cartons allowed"
                     required
                     min={1}
+                    disabled={userRole === "viewer"}
                     className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
                   />
                   <p className="text-[10px] text-zinc-400 font-medium mt-1">
@@ -1621,10 +1677,11 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
               )}
               <CustomButton 
                 type="submit"
+                disabled={userRole === "viewer"}
                 variant="dark"
                 className="w-full mt-2 h-10"
               >
-                Register Entity
+                {userRole === "viewer" ? "View Only" : "Register Entity"}
               </CustomButton>
             </form>
           </div>
@@ -1677,7 +1734,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                         <tr key={rec.id} className="hover:bg-zinc-50/50">
                           <td className="px-6 py-4 font-bold text-zinc-900">{rec.name}</td>
                           <td className="px-6 py-4 uppercase font-semibold text-zinc-400 text-[10px] tracking-wider">
-                            {rec.type === "monthly" ? "Monthly" : rec.type === "onetime" ? "One-Time" : "Open"}
+                            {rec.type === "monthly" ? "Monthly" : rec.type === "onetime" ? "One-Time Take" : "Open"}
                           </td>
                           <td className="px-6 py-4 text-right font-bold">{isLimited ? rec.limit : "∞"}</td>
                           <td className="px-6 py-4 text-right font-bold">{given.toFixed(1)}</td>
@@ -1688,11 +1745,13 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                             </span>
                           </td>
                           <td className="px-6 py-4 text-center flex justify-center">
-                            <Trash2 
-                              size={14} 
-                              onClick={() => handleDeleteReceiver(rec.id)}
-                              className="text-zinc-400 hover:text-red-600 cursor-pointer transition-colors"
-                            />
+                            {userRole === "admin" && (
+                              <Trash2 
+                                size={14} 
+                                onClick={() => handleDeleteReceiver(rec.id)}
+                                className="text-zinc-400 hover:text-red-600 cursor-pointer transition-colors"
+                              />
+                            )}
                           </td>
                         </tr>
                       );
