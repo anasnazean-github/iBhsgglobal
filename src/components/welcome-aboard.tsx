@@ -245,23 +245,6 @@ export function WelcomeAboardScreen({ profile, idToken, onLogout, onComplete }: 
         .custom-scrollbar {
           -webkit-overflow-scrolling: touch;
         }
-        .custom-scrollbar::-webkit-scrollbar {
-          -webkit-appearance: none;
-          width: 8px;
-          display: block !important;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: #f1f5f9;
-          border-radius: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #cbd5e1;
-          border-radius: 4px;
-          border: 2px solid #f1f5f9;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #94a3b8;
-        }
       `}</style>
 
       <div className="w-full max-w-3xl bg-[#E5E5E5] border border-zinc-300 rounded-lg shadow-lg flex flex-col h-[90vh] max-h-[90vh]">
