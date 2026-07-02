@@ -246,8 +246,9 @@ export function WelcomeAboardScreen({ profile, idToken, onLogout, onComplete }: 
           -webkit-overflow-scrolling: touch;
         }
         .custom-scrollbar::-webkit-scrollbar {
+          -webkit-appearance: none;
           width: 8px;
-          display: block;
+          display: block !important;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
           background: #f1f5f9;
@@ -287,7 +288,7 @@ export function WelcomeAboardScreen({ profile, idToken, onLogout, onComplete }: 
         {/* Scrollable NDA Text */}
         <div 
           onScroll={handleScroll}
-          className="flex-1 min-h-0 p-8 overflow-y-auto custom-scrollbar bg-zinc-50 text-zinc-700 text-xs leading-relaxed border-b border-zinc-300 whitespace-pre-wrap font-primary select-text"
+          className="flex-1 min-h-0 p-8 overflow-y-scroll custom-scrollbar bg-zinc-50 text-zinc-700 text-xs leading-relaxed border-b border-zinc-300 whitespace-pre-wrap font-primary select-text"
         >
           {contractText}
         </div>
