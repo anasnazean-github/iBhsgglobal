@@ -277,7 +277,7 @@ export function SettingModule({ profile, idToken }: SettingModuleProps) {
 
   if (profile?.role !== "Administrator") {
     return (
-      <div className="flex flex-col items-center justify-center p-8 bg-[#E5E5E5] border border-zinc-300 rounded-lg shadow-sm font-primary">
+      <div className="flex flex-col items-center justify-center p-8 bg-white border border-slate-200 rounded-lg shadow-xs font-primary">
         <span className="text-zinc-500 text-sm font-semibold italic text-center">
           Access Denied: Only Administrators can configure system settings.
         </span>
@@ -299,19 +299,19 @@ export function SettingModule({ profile, idToken }: SettingModuleProps) {
 
       <div className="w-full">
         {activeTab === "configuration" ? (
-          <div className="flex flex-col gap-6 bg-[#E5E5E5] border border-zinc-300 rounded-lg p-6 shadow-sm">
-            <div className="flex flex-col gap-1 border-b border-zinc-300 pb-4">
+          <div className="flex flex-col gap-6 bg-white border border-slate-200 rounded-lg p-6 shadow-xs">
+            <div className="flex flex-col gap-1 border-b border-slate-200 pb-4">
               <h3 className="text-lg font-bold text-zinc-900">Sign-Up Contract Management</h3>
               <p className="text-xs text-zinc-500">
                 Upload a new plain text contract (.txt file). When updated, all users will be prompted to read and sign it on their next login.
               </p>
             </div>
-
+ 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Left Column: Current Contract View */}
               <div className="flex flex-col gap-2">
                 <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Active Contract Preview</label>
-                <div className="flex-1 min-h-[250px] max-h-[350px] overflow-y-auto bg-zinc-50 border border-zinc-300 rounded-lg p-4 text-xs leading-relaxed text-zinc-700 whitespace-pre-wrap select-text custom-scrollbar">
+                <div className="flex-1 min-h-[250px] max-h-[350px] overflow-y-auto bg-slate-50/50 border border-slate-200 rounded-lg p-4 text-xs leading-relaxed text-zinc-700 whitespace-pre-wrap select-text custom-scrollbar">
                   {contractText || "No active contract uploaded yet. Fallback standard agreement is being used."}
                 </div>
                 {contractUpdatedAt > 0 && (
@@ -322,7 +322,7 @@ export function SettingModule({ profile, idToken }: SettingModuleProps) {
               </div>
 
               {/* Right Column: Upload Panel */}
-              <div className="flex flex-col gap-4 bg-[#EEEEEE] border border-zinc-300 rounded-lg p-5">
+              <div className="flex flex-col gap-4 bg-[#F0F4F9] border border-transparent rounded-lg p-5">
                 <h4 className="text-sm font-bold text-zinc-800">Publish New Contract</h4>
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Choose Plain Text (.txt) File</label>
@@ -330,15 +330,15 @@ export function SettingModule({ profile, idToken }: SettingModuleProps) {
                     type="file"
                     accept=".txt"
                     onChange={handleFileChange}
-                    className="w-full text-xs text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-[#E5E5E5] file:text-zinc-700 hover:file:bg-[#EEEEEE] file:cursor-pointer"
+                    className="w-full text-xs text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-xs file:font-bold file:bg-[#C2E7FF] file:text-[#001D35] hover:file:bg-[#B3DBF2] file:cursor-pointer"
                   />
                 </div>
 
                 {fileName && (
-                  <div className="flex flex-col gap-1 bg-zinc-50 border border-zinc-200 rounded p-3">
+                  <div className="flex flex-col gap-1 bg-white border border-slate-200 rounded p-3">
                     <span className="text-xs font-bold text-zinc-700 truncate">Selected: {fileName}</span>
                     <span className="text-[10px] text-zinc-500">Previewing first 200 characters:</span>
-                    <p className="text-[10px] text-zinc-650 italic truncate bg-[#EEEEEE] p-1.5 rounded border border-zinc-200 mt-1">
+                    <p className="text-[10px] text-zinc-600 italic truncate bg-[#F0F4F9] p-1.5 rounded border border-slate-200 mt-1">
                       {selectedFileContent.substring(0, 200)}...
                     </p>
                   </div>
@@ -346,10 +346,9 @@ export function SettingModule({ profile, idToken }: SettingModuleProps) {
 
                 <CustomButton
                   type="button"
-                  variant="dark"
                   onClick={handleUpdateContract}
                   disabled={!selectedFileContent || uploadingContract}
-                  className="w-full h-10 text-xs mt-2"
+                  className="w-full h-10 text-xs mt-2 bg-[#0B57D0] border-[#0B57D0] hover:bg-[#0842A0] text-white rounded"
                 >
                   {uploadingContract ? "Updating Contract..." : "Update Contract (Force Re-sign)"}
                 </CustomButton>
@@ -398,9 +397,9 @@ function ApiEditForm({ record, onSave, onCancel }: { record: any; onSave: (data:
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-xs p-4 animate-tableFadeInOnly">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-md bg-[#E5E5E5] border border-zinc-300 rounded-lg shadow-xl overflow-hidden flex flex-col font-primary"
+        className="w-full max-w-md bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden flex flex-col font-primary"
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-300 bg-[#EEEEEE]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-[#F0F4F9]">
           <h3 className="text-base font-bold text-zinc-950">
             {isNew ? "Create API Credential" : "Edit API Credential"}
           </h3>
@@ -416,7 +415,7 @@ function ApiEditForm({ record, onSave, onCancel }: { record: any; onSave: (data:
               value={formData.ID}
               onChange={(e) => setFormData((prev: any) => ({ ...prev, ID: e.target.value }))}
               placeholder="e.g. gemini_api"
-              className="h-9 px-3 bg-[#EEEEEE] border border-zinc-300 rounded-lg text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400/20 disabled:opacity-60 disabled:cursor-not-allowed font-semibold"
+              className="h-9 px-3 bg-[#F0F4F9] border border-slate-200 rounded text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-400/20 disabled:opacity-60 disabled:cursor-not-allowed font-semibold"
             />
           </div>
 
@@ -428,7 +427,7 @@ function ApiEditForm({ record, onSave, onCancel }: { record: any; onSave: (data:
               value={formData.Name}
               onChange={(e) => setFormData((prev: any) => ({ ...prev, Name: e.target.value }))}
               placeholder="e.g. Gemini OCR Flash"
-              className="h-9 px-3 bg-[#EEEEEE] border border-zinc-300 rounded-lg text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400/20 font-semibold"
+              className="h-9 px-3 bg-[#F0F4F9] border border-slate-200 rounded text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-400/20 font-semibold"
             />
           </div>
 
@@ -440,20 +439,20 @@ function ApiEditForm({ record, onSave, onCancel }: { record: any; onSave: (data:
               value={formData.Key}
               onChange={(e) => setFormData((prev: any) => ({ ...prev, Key: e.target.value }))}
               placeholder="e.g. AIzaSy..."
-              className="h-9 px-3 bg-[#EEEEEE] border border-zinc-300 rounded-lg text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400/20 font-semibold"
+              className="h-9 px-3 bg-[#F0F4F9] border border-slate-200 rounded text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-400/20 font-semibold"
             />
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 px-6 py-4 bg-[#EEEEEE] border-t border-zinc-300">
+        <div className="flex justify-end gap-3 px-6 py-4 bg-[#F0F4F9] border-t border-slate-200">
           <button
             type="button"
             onClick={onCancel}
-            className="h-9 px-4 text-xs font-bold rounded-lg border border-zinc-300 bg-[#E5E5E5] text-zinc-700 hover:text-zinc-950 hover:bg-[#EEEEEE]/50 cursor-pointer"
+            className="h-9 px-4 text-xs font-bold rounded border border-slate-200 bg-white text-zinc-700 hover:text-zinc-950 hover:bg-slate-100 cursor-pointer"
           >
             Cancel
           </button>
-          <CustomButton variant="dark" type="submit" className="h-9 text-xs">
+          <CustomButton type="submit" className="h-9 text-xs bg-[#0B57D0] border-[#0B57D0] hover:bg-[#0842A0] text-white rounded">
             Save
           </CustomButton>
         </div>

@@ -267,12 +267,12 @@ export function InvoiceBarcodeGeneratorModule() {
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
-          className={`relative border-2 border-dashed rounded-lg p-8 flex flex-col items-center justify-center cursor-pointer transition-all ${
+          className={`relative border-2 border-dashed rounded p-8 flex flex-col items-center justify-center cursor-pointer transition-all ${
             currentPdfData
               ? "border-emerald-500 bg-emerald-50/10"
               : isDragging
-              ? "border-zinc-800 bg-[#EEEEEE]/50"
-              : "border-zinc-400 bg-[#EEEEEE]/30 hover:border-zinc-600 hover:bg-[#EEEEEE]/50"
+              ? "border-blue-500 bg-[#F0F4F9]"
+              : "border-slate-300 bg-[#F0F4F9]/40 hover:border-blue-400 hover:bg-[#F0F4F9]/70"
           }`}
         >
           {currentPdfData && (
@@ -281,7 +281,7 @@ export function InvoiceBarcodeGeneratorModule() {
                 e.stopPropagation();
                 resetTool();
               }}
-              className="absolute top-3 right-3 p-1.5 rounded-lg border border-zinc-300 bg-[#EEEEEE] text-red-600 hover:bg-red-50 transition-colors shadow-xs"
+              className="absolute top-3 right-3 p-1.5 rounded border border-slate-200 bg-white text-red-600 hover:bg-red-50 transition-colors shadow-xs"
               title="Clear Uploaded PDF"
             >
               <Trash2 className="w-4 h-4" />
@@ -289,7 +289,7 @@ export function InvoiceBarcodeGeneratorModule() {
           )}
 
           <div
-            className={`w-12 h-12 rounded-lg border border-zinc-300 bg-[#EEEEEE] flex items-center justify-center shadow-xs mb-3 ${
+            className={`w-12 h-12 rounded border border-slate-100 bg-[#F0F4F9] flex items-center justify-center shadow-xs mb-3 ${
               currentPdfData ? "text-emerald-600" : "text-zinc-500"
             }`}
           >

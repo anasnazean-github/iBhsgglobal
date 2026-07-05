@@ -3,7 +3,7 @@
 import * as React from "react";
 import { DataTable, Column } from "../data-table";
 import { showToast } from "@/lib/toast";
-import { History, X, Clock, UserCheck, Plus, Check } from "lucide-react";
+import { History, X, Clock, UserCheck, Plus, Check, Tag } from "lucide-react";
 import { NavigationTabs } from "../navigation-tabs";
 import { CustomButton } from "../custom-button";
 import { TagInput } from "./MerchandiserModule";
@@ -625,7 +625,7 @@ export function RetailerSkusModule({ profile }: RetailerSkusModuleProps) {
     <div className="flex flex-col gap-5 font-primary h-full relative">
       
       {/* Top Bar Filter Dropdown */}
-      <div className="flex items-center gap-3.5 bg-[#E5E5E5] border border-zinc-300 rounded-lg p-4 shadow-sm w-fit font-primary">
+      <div className="flex items-center gap-3.5 bg-white border border-slate-200 rounded-xl p-4 shadow-xs w-fit font-primary">
         <label className="text-xs font-extrabold text-zinc-700 uppercase tracking-wider whitespace-nowrap">Select Retailer:</label>
         <select
           value={selectedRetailerId}
@@ -633,7 +633,7 @@ export function RetailerSkusModule({ profile }: RetailerSkusModuleProps) {
             setSelectedRetailerId(e.target.value);
             setIsEditMode(false);
           }}
-          className="bg-[#EEEEEE] border border-zinc-300 rounded px-3 py-1.5 text-xs font-bold text-zinc-800 focus:outline-none focus:ring-1 focus:ring-zinc-400 cursor-pointer min-w-[200px]"
+          className="bg-slate-50 border border-slate-200 hover:bg-slate-100/50 hover:border-slate-350 rounded-lg px-3 py-1.5 text-xs font-bold text-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 cursor-pointer min-w-[200px] transition-all duration-150"
         >
           <option value="">-- Choose Retailer --</option>
           {retailers.map((r) => (
@@ -645,8 +645,9 @@ export function RetailerSkusModule({ profile }: RetailerSkusModuleProps) {
       </div>
 
       {!selectedRetailerId ? (
-        <div className="flex flex-col items-center justify-center h-64 bg-[#E5E5E5] border border-dashed border-zinc-350 rounded-lg select-none">
-          <span className="font-primary text-sm text-zinc-500 italic">
+        <div className="flex flex-col items-center justify-center h-64 bg-slate-50/50 border border-dashed border-slate-200 rounded-xl select-none p-6 text-center">
+          <Tag className="w-8 h-8 text-zinc-400 mb-3 stroke-[1.5]" />
+          <span className="font-primary text-xs font-semibold text-zinc-500 max-w-xs leading-relaxed">
             Please select a retailer from the dropdown above to view the SKU registry.
           </span>
         </div>
@@ -706,11 +707,11 @@ export function RetailerSkusModule({ profile }: RetailerSkusModuleProps) {
 
           {/* Sidebar */}
           <div
-            className="relative w-full max-w-md h-full bg-[#EEEEEE] border-l border-zinc-300 shadow-2xl flex flex-col z-10 animate-sidebarSlideIn"
+            className="relative w-full max-w-md h-full bg-white border-l border-slate-200 shadow-2xl flex flex-col z-10 animate-sidebarSlideIn"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-zinc-300 p-6 flex-shrink-0">
+            <div className="flex items-center justify-between border-b border-slate-200 p-6 flex-shrink-0">
               <div className="flex items-center gap-2">
                 <History size={16} className="text-zinc-700" />
                 <h3 className="font-bold text-sm text-zinc-800 uppercase tracking-wider">
@@ -719,14 +720,14 @@ export function RetailerSkusModule({ profile }: RetailerSkusModuleProps) {
               </div>
               <button
                 onClick={() => { setViewingLogType(null); setActiveLogRecord(null); }}
-                className="p-1 rounded hover:bg-zinc-200 text-zinc-500 hover:text-zinc-800 focus:outline-none cursor-pointer"
+                className="p-1 rounded hover:bg-slate-100 text-zinc-500 hover:text-zinc-800 focus:outline-none cursor-pointer"
               >
                 <X size={16} />
               </button>
             </div>
 
             {/* Context Info */}
-            <div className="mx-6 my-4 flex flex-col gap-1 bg-zinc-200/50 border border-zinc-300/50 rounded p-3 text-xs text-zinc-700 flex-shrink-0">
+            <div className="mx-6 my-4 flex flex-col gap-1 bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-zinc-700 flex-shrink-0">
               <span className="font-bold text-zinc-800">
                 SKU: {activeLogRecord["SKU Number"]} - {activeLogRecord["SKU Name"]}
               </span>
@@ -734,7 +735,7 @@ export function RetailerSkusModule({ profile }: RetailerSkusModuleProps) {
 
             {/* Timeline scroll items */}
             <div className="flex-1 overflow-y-auto px-6 pr-4 pb-6 flex flex-col gap-5 relative pl-10">
-              <div className="absolute left-[33px] top-2 bottom-6 w-0.5 bg-zinc-300" />
+              <div className="absolute left-[33px] top-2 bottom-6 w-0.5 bg-slate-200" />
 
               {timelineLogItems.length > 0 ? (
                 timelineLogItems.map((log: any, idx: number) => {
@@ -746,7 +747,7 @@ export function RetailerSkusModule({ profile }: RetailerSkusModuleProps) {
                       </div>
 
                       {/* Log details card */}
-                      <div className="flex flex-col gap-2 bg-[#E5E5E5]/40 border border-zinc-300/30 rounded-lg p-3 w-full shadow-2xs hover:bg-[#E5E5E5]/60 transition-colors">
+                      <div className="flex flex-col gap-2 bg-slate-50 border border-slate-200 rounded-xl p-3 w-full shadow-2xs hover:bg-slate-100/50 transition-colors">
                         <div className="flex items-center justify-between flex-wrap gap-1">
                           <span className="text-[9px] text-zinc-400 font-mono">
                             {log.Timestamp || "Unknown Date"}
@@ -808,10 +809,10 @@ export function RetailerSkusModule({ profile }: RetailerSkusModuleProps) {
             </div>
 
             {/* Bottom Actions */}
-            <div className="border-t border-zinc-300 p-6 bg-zinc-100/50 flex items-center justify-center flex-shrink-0">
+            <div className="border-t border-slate-200 p-6 bg-slate-50/50 flex items-center justify-center flex-shrink-0">
               <CustomButton
                 onClick={() => { setViewingLogType(null); setActiveLogRecord(null); }}
-                className="bg-zinc-800 text-white hover:bg-zinc-950 text-xs font-bold w-full flex justify-center py-2 rounded"
+                className="bg-zinc-900 text-white hover:bg-black text-xs font-bold w-full flex justify-center py-2 rounded"
               >
                 Close View
               </CustomButton>
@@ -825,16 +826,16 @@ export function RetailerSkusModule({ profile }: RetailerSkusModuleProps) {
         <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-tableFadeInOnly">
           <form
             onSubmit={handleSaveRecord}
-            className="bg-[#EEEEEE] border border-zinc-300 rounded-lg shadow-xl max-w-lg w-full p-6 animate-modalSlideUp flex flex-col gap-4 overflow-y-auto max-h-[90vh]"
+            className="bg-white border border-slate-200 rounded-xl shadow-xl max-w-lg w-full p-6 animate-modalSlideUp flex flex-col gap-4 overflow-y-auto max-h-[90vh]"
           >
-            <div className="flex items-center justify-between border-b border-zinc-300 pb-2">
-              <h3 className="font-bold text-sm text-zinc-800 uppercase tracking-wider">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <h3 className="font-bold text-sm text-zinc-850 uppercase tracking-wider">
                 {editingRecord.isNew ? "Add Retailer SKU" : "Edit Retailer SKU"}
               </h3>
               <button
                 type="button"
                 onClick={() => setEditingRecord(null)}
-                className="p-1 rounded hover:bg-zinc-200 text-zinc-500 hover:text-zinc-800 focus:outline-none cursor-pointer"
+                className="p-1 rounded hover:bg-slate-100 text-zinc-500 hover:text-zinc-800 focus:outline-none cursor-pointer"
               >
                 <X size={16} />
               </button>
@@ -853,8 +854,8 @@ export function RetailerSkusModule({ profile }: RetailerSkusModuleProps) {
                   placeholder="e.g. 100201"
                   className={`w-full text-xs border rounded-lg px-3 py-2 font-semibold focus:outline-none ${
                     !editingRecord.isNew
-                      ? "bg-zinc-200 border-zinc-300 text-zinc-500 cursor-not-allowed"
-                      : "bg-[#EEEEEE] border-zinc-300 text-zinc-900 focus:border-zinc-400"
+                      ? "bg-slate-100 border-slate-200 text-zinc-500 cursor-not-allowed"
+                      : "bg-slate-50/50 border-slate-200 text-zinc-900 focus:border-blue-500 focus:bg-white"
                   }`}
                 />
               </div>
@@ -868,7 +869,7 @@ export function RetailerSkusModule({ profile }: RetailerSkusModuleProps) {
                   onChange={(e) => setEditingRecord({ ...editingRecord, "SKU Name": e.target.value })}
                   required
                   placeholder="e.g. Bibik Crispy Fried Chicken (Regular)"
-                  className="w-full text-xs bg-[#EEEEEE] border border-zinc-300 rounded-lg px-3 py-2 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
+                  className="w-full text-xs bg-slate-50/50 border border-slate-200 focus:border-blue-500 focus:bg-white rounded-lg px-3 py-2 text-zinc-900 focus:outline-none font-semibold transition-all duration-150"
                 />
               </div>
 
@@ -905,9 +906,9 @@ export function RetailerSkusModule({ profile }: RetailerSkusModuleProps) {
               </div>
 
               {/* NEW COST PRICE */}
-              <div className="border-t border-zinc-300/60 pt-3">
+              <div className="border-t border-slate-200 pt-3">
                 <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-2">Cost Price Update</h4>
-                <div className="flex flex-col gap-1 bg-zinc-200/40 border border-zinc-300/40 rounded-lg p-3">
+                <div className="flex flex-col gap-1 bg-slate-50/60 border border-slate-200/60 rounded-xl p-3">
                   <div className="text-[9px] text-zinc-500 font-bold mb-1">
                     Current: {getLatestCostPrice(editingRecord["Cost Price Log"])}
                   </div>
@@ -919,22 +920,22 @@ export function RetailerSkusModule({ profile }: RetailerSkusModuleProps) {
                       value={newCostVal}
                       onChange={(e) => setNewCostVal(e.target.value)}
                       placeholder="e.g. 10.50"
-                      className="w-full text-xs bg-[#EEEEEE] border border-zinc-300 rounded-lg px-3 py-2 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
+                      className="w-full text-xs bg-white border border-slate-200 focus:border-blue-500 focus:bg-white rounded-lg px-3 py-2 text-zinc-900 focus:outline-none font-semibold transition-all duration-150"
                     />
                   </div>
                 </div>
               </div>
 
               {/* NEW RSP LOG */}
-              <div className="border-t border-zinc-300/60 pt-3">
+              <div className="border-t border-slate-200 pt-3">
                 <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-2">RSP Tiers Update</h4>
-                <div className="flex flex-col gap-3 bg-zinc-200/40 border border-zinc-300/40 rounded-lg p-3 text-xs">
-                  <div className="text-[9px] text-zinc-500 font-bold border-b border-zinc-300/20 pb-1.5 mb-1">
+                <div className="flex flex-col gap-3 bg-slate-50/60 border border-slate-200/60 rounded-xl p-3 text-xs">
+                  <div className="text-[9px] text-zinc-500 font-bold border-b border-slate-200/20 pb-1.5 mb-1">
                     Current: {getLatestRsp(editingRecord["RSP Log"])}
                   </div>
                   
                   {rspFormTiers.map((tier, idx) => (
-                    <div key={idx} className="flex flex-col gap-2 border-b border-zinc-300/20 pb-2 last:border-b-0 last:pb-0">
+                    <div key={idx} className="flex flex-col gap-2 border-b border-slate-200/20 pb-2 last:border-b-0 last:pb-0">
                       <div className="flex items-center justify-between">
                         <span className="text-[9px] font-extrabold text-zinc-600 uppercase">Tier #{idx + 1}</span>
                         {rspFormTiers.length > 1 && (
@@ -959,7 +960,7 @@ export function RetailerSkusModule({ profile }: RetailerSkusModuleProps) {
                               updated[idx].Tier = e.target.value;
                               setRspFormTiers(updated);
                             }} 
-                            className="w-full bg-[#EEEEEE] border border-zinc-300 text-xs px-2 py-1 rounded focus:outline-none font-semibold text-zinc-800" 
+                            className="w-full bg-white border border-slate-200 text-xs px-2 py-1 rounded focus:outline-none font-semibold text-zinc-800" 
                           />
                         </div>
                         <div className="flex flex-col gap-0.5 col-span-1 font-primary">
@@ -974,7 +975,7 @@ export function RetailerSkusModule({ profile }: RetailerSkusModuleProps) {
                               updated[idx].Price = e.target.value;
                               setRspFormTiers(updated);
                             }} 
-                            className="w-full bg-[#EEEEEE] border border-zinc-300 text-xs px-2 py-1 rounded focus:outline-none font-semibold text-zinc-800" 
+                            className="w-full bg-white border border-slate-200 text-xs px-2 py-1 rounded focus:outline-none font-semibold text-zinc-800" 
                           />
                         </div>
                         <div className="flex flex-col gap-0.5 col-span-1 font-primary">
@@ -987,7 +988,7 @@ export function RetailerSkusModule({ profile }: RetailerSkusModuleProps) {
                               updated[idx]["Range Date Start"] = e.target.value;
                               setRspFormTiers(updated);
                             }} 
-                            className="w-full bg-[#EEEEEE] border border-zinc-300 text-xs px-1 py-0.5 rounded focus:outline-none" 
+                            className="w-full bg-white border border-slate-200 text-xs px-1 py-0.5 rounded focus:outline-none text-zinc-750" 
                           />
                         </div>
                         <div className="flex flex-col gap-0.5 col-span-1 font-primary">
@@ -1000,7 +1001,7 @@ export function RetailerSkusModule({ profile }: RetailerSkusModuleProps) {
                               updated[idx]["Range Date End"] = e.target.value;
                               setRspFormTiers(updated);
                             }} 
-                            className="w-full bg-[#EEEEEE] border border-zinc-300 text-xs px-1 py-0.5 rounded focus:outline-none" 
+                            className="w-full bg-white border border-slate-200 text-xs px-1 py-0.5 rounded focus:outline-none text-zinc-750" 
                           />
                         </div>
                       </div>
@@ -1010,7 +1011,7 @@ export function RetailerSkusModule({ profile }: RetailerSkusModuleProps) {
                   <button
                     type="button"
                     onClick={() => setRspFormTiers([...rspFormTiers, { Tier: `Tier ${rspFormTiers.length + 1}`, Price: "", "Range Date Start": "", "Range Date End": "" }])}
-                    className="mt-1 px-3 py-1.5 bg-zinc-200 hover:bg-zinc-300 text-zinc-700 border border-zinc-300 font-extrabold text-[10px] rounded focus:outline-none cursor-pointer w-fit"
+                    className="mt-1 px-3 py-1.5 bg-white hover:bg-slate-50 text-zinc-700 border border-slate-200 font-extrabold text-[10px] rounded focus:outline-none cursor-pointer w-fit shadow-3xs"
                   >
                     + Add Tier Row
                   </button>
@@ -1018,15 +1019,15 @@ export function RetailerSkusModule({ profile }: RetailerSkusModuleProps) {
               </div>
 
               {/* NEW PROMOTIONS LOG */}
-              <div className="border-t border-zinc-300/60 pt-3 font-primary">
+              <div className="border-t border-slate-200 pt-3 font-primary">
                 <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-2">Promotions Update</h4>
-                <div className="flex flex-col gap-3 bg-zinc-200/40 border border-zinc-300/40 rounded-lg p-3 text-xs">
-                  <div className="text-[9px] text-zinc-500 font-bold border-b border-zinc-300/20 pb-1.5 mb-1">
+                <div className="flex flex-col gap-3 bg-slate-50/60 border border-slate-200/60 rounded-xl p-3 text-xs">
+                  <div className="text-[9px] text-zinc-500 font-bold border-b border-slate-200/20 pb-1.5 mb-1">
                     Current: {getLatestPromo(editingRecord["Promotion Log"])}
                   </div>
                   
                   {promoFormItems.map((promo, idx) => (
-                    <div key={idx} className="flex flex-col gap-2 border-b border-zinc-300/20 pb-2 last:border-b-0 last:pb-0">
+                    <div key={idx} className="flex flex-col gap-2 border-b border-slate-200/20 pb-2 last:border-b-0 last:pb-0">
                       <div className="flex items-center justify-between">
                         <span className="text-[9px] font-extrabold text-zinc-600 uppercase">Promo #{idx + 1}</span>
                         {promoFormItems.length > 1 && (
@@ -1051,7 +1052,7 @@ export function RetailerSkusModule({ profile }: RetailerSkusModuleProps) {
                               updated[idx]["Promo Name"] = e.target.value;
                               setPromoFormItems(updated);
                             }} 
-                            className="w-full bg-[#EEEEEE] border border-zinc-300 text-[10px] px-1.5 py-1 rounded focus:outline-none font-semibold text-zinc-800" 
+                            className="w-full bg-white border border-slate-200 text-[10px] px-1.5 py-1 rounded focus:outline-none font-semibold text-zinc-800" 
                           />
                         </div>
                         <div className="flex flex-col gap-0.5">
@@ -1066,7 +1067,7 @@ export function RetailerSkusModule({ profile }: RetailerSkusModuleProps) {
                               updated[idx].Price = e.target.value;
                               setPromoFormItems(updated);
                             }} 
-                            className="w-full bg-[#EEEEEE] border border-zinc-300 text-[10px] px-1.5 py-1 rounded focus:outline-none font-semibold text-zinc-800" 
+                            className="w-full bg-white border border-slate-200 text-[10px] px-1.5 py-1 rounded focus:outline-none font-semibold text-zinc-800" 
                           />
                         </div>
                         <div className="flex flex-col gap-0.5">
@@ -1079,7 +1080,7 @@ export function RetailerSkusModule({ profile }: RetailerSkusModuleProps) {
                               updated[idx]["Range Date Start"] = e.target.value;
                               setPromoFormItems(updated);
                             }} 
-                            className="w-full bg-[#EEEEEE] border border-zinc-300 text-[10px] px-1 py-0.5 rounded focus:outline-none" 
+                            className="w-full bg-white border border-slate-200 text-[10px] px-1 py-0.5 rounded focus:outline-none text-zinc-700" 
                           />
                         </div>
                         <div className="flex flex-col gap-0.5">
@@ -1092,7 +1093,7 @@ export function RetailerSkusModule({ profile }: RetailerSkusModuleProps) {
                               updated[idx]["Range Date End"] = e.target.value;
                               setPromoFormItems(updated);
                             }} 
-                            className="w-full bg-[#EEEEEE] border border-zinc-300 text-[10px] px-1 py-0.5 rounded focus:outline-none" 
+                            className="w-full bg-white border border-slate-200 text-[10px] px-1 py-0.5 rounded focus:outline-none text-zinc-700" 
                           />
                         </div>
                       </div>
@@ -1102,7 +1103,7 @@ export function RetailerSkusModule({ profile }: RetailerSkusModuleProps) {
                   <button
                     type="button"
                     onClick={() => setPromoFormItems([...promoFormItems, { "Promo Name": "", Price: "", "Range Date Start": "", "Range Date End": "" }])}
-                    className="mt-1 px-3 py-1.5 bg-zinc-200 hover:bg-zinc-300 text-zinc-700 border border-zinc-300 font-extrabold text-[10px] rounded focus:outline-none cursor-pointer w-fit"
+                    className="mt-1 px-3 py-1.5 bg-white hover:bg-slate-50 text-zinc-700 border border-slate-200 font-extrabold text-[10px] rounded focus:outline-none cursor-pointer w-fit shadow-3xs"
                   >
                     + Add Promo Row
                   </button>
@@ -1112,17 +1113,17 @@ export function RetailerSkusModule({ profile }: RetailerSkusModuleProps) {
             </div>
 
             {/* Form footer */}
-            <div className="flex justify-end gap-2.5 pt-3 border-t border-zinc-300 mt-2 font-primary">
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-200 mt-2 font-primary">
               <button
                 type="button"
                 onClick={() => setEditingRecord(null)}
-                className="px-4 py-2 text-xs font-bold bg-[#E5E5E5] hover:bg-zinc-300 border border-zinc-300 rounded-lg text-zinc-700 hover:text-zinc-950 transition-colors cursor-pointer"
+                className="px-4 py-2 text-xs font-bold bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-zinc-700 hover:text-zinc-950 transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 text-xs font-bold bg-zinc-800 hover:bg-zinc-950 text-white rounded-lg transition-colors cursor-pointer"
+                className="px-4 py-2 text-xs font-bold bg-zinc-900 hover:bg-black text-white rounded-lg transition-colors cursor-pointer"
               >
                 Save Record
               </button>

@@ -410,7 +410,7 @@ export default function Home() {
     return (
       <>
         {/* Mobile View Block */}
-        <div className="flex md:hidden min-h-screen w-full flex-col items-center justify-center bg-[#EEEEEE] p-6 select-none font-primary text-center">
+        <div className="flex md:hidden print:hidden min-h-screen w-full flex-col items-center justify-center bg-[#EEEEEE] p-6 select-none font-primary text-center">
           <div className="w-full max-w-sm bg-[#E5E5E5] border border-zinc-300 rounded-lg p-6 shadow-md flex flex-col gap-4 items-center">
             <div className="h-10 w-10 rounded-lg bg-zinc-750 text-white flex items-center justify-center shadow-xs">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-monitor-smartphone"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
@@ -429,7 +429,7 @@ export default function Home() {
         </div>
 
         {/* Desktop/Tablet View */}
-        <div className="hidden md:flex h-screen w-full bg-[#EEEEEE] overflow-hidden">
+        <div className="hidden md:flex print:flex h-screen w-full bg-[#F8F9FC] overflow-hidden">
           <SidePanel 
             activeItem={activeItem} 
             onSelectMenu={handleMenuSelect} 

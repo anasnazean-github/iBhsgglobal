@@ -313,3 +313,230 @@ export async function finalizeContractSignature(
     modules_access: safeParseAccess(data.modules_access),
   };
 }
+
+// 8. GOOGLE DRIVE ASSET LIBRARY APIs
+export interface AssetFile {
+  id: string;
+  name: string;
+  isFolder: boolean;
+  mimeType: string;
+  size?: number;
+  url?: string;
+  downloadUrl?: string;
+}
+
+export interface AssetListResponse {
+  parentId: string;
+  folders: AssetFile[];
+  files: AssetFile[];
+}
+
+export async function fetchAssets(folderId?: string, skipCache = false): Promise<AssetListResponse> {
+  const buster = `t=${Date.now()}`;
+  let target = `${WORKER_URL}/api/assets/list?`;
+  if (folderId) {
+    target += `folderId=${encodeURIComponent(folderId)}&`;
+  }
+  if (skipCache) {
+    target += `skipCache=true&`;
+  }
+  target += buster;
+  const res = await fetch(target, {
+    method: "GET",
+  });
+  return handleResponse(res, "Retrieve assets");
+}
+
+export async function createAssetFolder(name: string, parentId?: string): Promise<{ success: boolean; id: string; name: string }> {
+  const res = await fetch(`${WORKER_URL}/api/assets/folder`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ name, parentId }),
+  });
+  return handleResponse(res, "Create folder");
+}
+
+export async function uploadAssetFile(
+  file: File,
+  parentId?: string
+): Promise<{ success: boolean; id: string; name: string; url: string; downloadUrl: string }> {
+  const arrayBuffer = await file.arrayBuffer();
+  let binary = "";
+  const bytes = new Uint8Array(arrayBuffer);
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  const base64Data = btoa(binary);
+
+  const res = await fetch(`${WORKER_URL}/api/assets/upload`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      fileName: file.name,
+      contentType: file.type || "application/octet-stream",
+      base64Data,
+      parentId,
+    }),
+  });
+  return handleResponse(res, "Upload file");
+}
+
+export async function deleteAssetFile(fileId: string): Promise<{ success: boolean }> {
+  const res = await fetch(`${WORKER_URL}/api/assets/delete`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ fileId }),
+  });
+  return handleResponse(res, "Delete asset file");
+}
+
+export interface SnapDeal {
+  id: string;
+  dealing_with: string;
+  handshake_date: number;
+  notes?: string;
+  terms_conditions?: string;
+  deal_data: string; // JSON string
+  signed_proof_url?: string;
+  status: string; // "Active" | "Locked"
+}
+
+export interface SnapDealLog {
+  id: string;
+  deal_id: string;
+  timestamp: number;
+  actor_email: string;
+  actor_name: string;
+  action: string;
+}
+
+export async function fetchSnapDeals(): Promise<SnapDeal[]> {
+  const res = await fetch(`${WORKER_URL}/api/snap-deals/list`, {
+    method: "GET"
+  });
+  return handleResponse(res, "Retrieve snap deals");
+}
+
+export async function saveSnapDeal(
+  deal: Partial<SnapDeal> & { actor_email: string; actor_name: string }
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${WORKER_URL}/api/snap-deals/save`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(deal)
+  });
+  return handleResponse(res, "Save snap deal");
+}
+
+export async function uploadSignedProof(
+  dealId: string,
+  file: File,
+  actor_email: string,
+  actor_name: string
+): Promise<{ success: boolean }> {
+  // Step 1: Upload raw file to Cloudflare R2
+  const fileName = `deal_signed/signed-deal-${dealId}-${Date.now()}-${file.name.replace(/\s+/g, "_")}`;
+  const uploadRes = await fetch(`${WORKER_URL}/api/upload?filename=${encodeURIComponent(fileName)}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": file.type || "application/octet-stream"
+    },
+    body: file
+  });
+
+  if (!uploadRes.ok) {
+    throw new Error(`Failed to upload file to storage. Status ${uploadRes.status}`);
+  }
+  const uploadData = (await uploadRes.json()) as any;
+  if (!uploadData.success || !uploadData.url) {
+    throw new Error("Storage upload failed");
+  }
+
+  // Step 2: Lock deal in database with the signed proof URL
+  const res = await fetch(`${WORKER_URL}/api/snap-deals/upload-proof`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      id: dealId,
+      signed_proof_url: uploadData.url,
+      actor_email,
+      actor_name
+    })
+  });
+  return handleResponse(res, "Lock deal with proof");
+}
+
+export async function revokeSnapDeal(
+  dealId: string,
+  actor_email: string,
+  actor_name: string
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${WORKER_URL}/api/snap-deals/revoke`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      id: dealId,
+      actor_email,
+      actor_name
+    })
+  });
+  return handleResponse(res, "Revoke deal lock");
+}
+
+export async function fetchSnapDealLogs(dealId: string): Promise<SnapDealLog[]> {
+  const res = await fetch(`${WORKER_URL}/api/snap-deals/logs?dealId=${encodeURIComponent(dealId)}`, {
+    method: "GET"
+  });
+  return handleResponse(res, "Retrieve snap deal logs");
+}
+
+export async function archiveSnapDeal(
+  dealId: string,
+  actor_email: string,
+  actor_name: string
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${WORKER_URL}/api/snap-deals/archive`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      id: dealId,
+      actor_email,
+      actor_name
+    })
+  });
+  return handleResponse(res, "Archive deal");
+}
+
+export async function restoreSnapDeal(
+  dealId: string,
+  actor_email: string,
+  actor_name: string
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${WORKER_URL}/api/snap-deals/restore`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      id: dealId,
+      actor_email,
+      actor_name
+    })
+  });
+  return handleResponse(res, "Restore deal from archive");
+}
+

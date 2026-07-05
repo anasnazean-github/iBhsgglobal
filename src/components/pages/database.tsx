@@ -85,7 +85,7 @@ export function DatabasePage({ profile }: DatabasePageProps) {
         {activeSubDb ? (
           renderActiveSubModule()
         ) : visibleModules.length === 0 ? (
-          <div className="flex items-center justify-center h-48 bg-[#E5E5E5] border border-dashed border-zinc-300 rounded-lg select-none">
+          <div className="flex items-center justify-center h-48 bg-[#F0F4F9] border border-dashed border-slate-200 rounded select-none">
             <span className="font-primary text-sm text-zinc-500 italic">
               No modules assigned. Please contact your administrator.
             </span>

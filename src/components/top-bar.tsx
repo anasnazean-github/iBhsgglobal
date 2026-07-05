@@ -89,7 +89,7 @@ export function TopBar({ breadcrumbPath, onBack, onNavigateBreadcrumb }: TopBarP
   }, [startRedTimer, handleRefresh]);
 
   return (
-    <header className="flex h-9 w-full items-center bg-[#E5E5E5] px-6 border-b border-zinc-300/40 select-none relative z-40">
+    <header className="flex h-9 w-full items-center bg-[#F0F4F9] px-6 border-b border-slate-200 select-none relative z-40">
       {/* Left: Breadcrumbs only (vertically centered in h-9) */}
       <div className="flex items-center gap-2">
         {breadcrumbPath.map((segment, idx) => (
@@ -116,7 +116,7 @@ export function TopBar({ breadcrumbPath, onBack, onNavigateBreadcrumb }: TopBarP
         {breadcrumbPath.length > 1 && (
           <button
             onClick={onBack}
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-[#EEEEEE] hover:bg-[#DCDCDC] text-zinc-600 hover:text-zinc-950 transition-all border border-zinc-300 focus:outline-none cursor-pointer shadow-sm"
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-white hover:bg-slate-100 text-[#474747] hover:text-[#1F1F1F] transition-all border border-slate-200 focus:outline-none cursor-pointer shadow-xs"
             title="Close / Exit simulation"
           >
             <X size={14} />
@@ -129,10 +129,10 @@ export function TopBar({ breadcrumbPath, onBack, onNavigateBreadcrumb }: TopBarP
             onClick={handleRefresh}
             disabled={isRefreshing}
             className={cn(
-              "flex h-7 w-7 items-center justify-center rounded-full transition-all border focus:outline-none cursor-pointer disabled:opacity-75 shadow-sm",
+              "flex h-7 w-7 items-center justify-center rounded-full transition-all border focus:outline-none cursor-pointer disabled:opacity-75 shadow-xs",
               isRed
                 ? "bg-red-500 border-red-600 text-white hover:bg-red-600 hover:border-red-700"
-                : "bg-[#EEEEEE] border-zinc-300 text-zinc-600 hover:text-zinc-950 hover:bg-[#DCDCDC]"
+                : "bg-white border-slate-200 text-[#474747] hover:text-[#1F1F1F] hover:bg-slate-100"
             )}
             title={isRed ? "Data is older than 5 minutes. Click to refresh." : "Refresh data"}
           >

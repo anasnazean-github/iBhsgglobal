@@ -59,6 +59,15 @@ export function UsersModule({ idToken = "simulated-id-token", profile }: UsersMo
     loadUsers(hasCache);
   }, [loadUsers]);
 
+  React.useEffect(() => {
+    const handleDbRefresh = async () => {
+      await loadUsers();
+      showToast("Users database refreshed successfully!", "success");
+    };
+    window.addEventListener("db-refresh", handleDbRefresh);
+    return () => window.removeEventListener("db-refresh", handleDbRefresh);
+  }, [loadUsers]);
+
   const handleSaveModalUser = async (updatedUser: any) => {
     try {
       const myEmail = profile?.email || "admin@hsg-global.com";
@@ -125,7 +134,7 @@ export function UsersModule({ idToken = "simulated-id-token", profile }: UsersMo
 
   if (profile?.role !== "Administrator") {
     return (
-      <div className="flex flex-col items-center justify-center p-8 bg-[#E5E5E5] border border-zinc-300 rounded-lg shadow-sm font-primary">
+      <div className="flex flex-col items-center justify-center p-8 bg-white border border-slate-200 rounded-lg shadow-xs font-primary">
         <span className="text-zinc-500 text-sm font-semibold italic text-center">
           Access Denied: Only Administrators can view or manage users.
         </span>

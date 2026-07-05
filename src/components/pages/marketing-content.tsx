@@ -12,9 +12,10 @@ interface MarketingContentPageProps {
     role: string;
     modules_access: string[];
   } | null;
+  idToken?: string;
 }
 
-export function MarketingContentPage({ profile }: MarketingContentPageProps) {
+export function MarketingContentPage({ profile, idToken }: MarketingContentPageProps) {
   const [activeSubModule, setActiveSubModule] = React.useState<string | null>(null);
 
   const subModules = React.useMemo(() => {
@@ -58,7 +59,7 @@ export function MarketingContentPage({ profile }: MarketingContentPageProps) {
   const renderActiveSubModule = () => {
     switch (activeSubModule) {
       case "Asset Library":
-        return <AssetLibraryModule />;
+        return <AssetLibraryModule profile={profile} idToken={idToken} />;
       case "TikTok & Storyboard Briefs":
         return <TikTokStoryboardBriefsModule />;
       case "Marketing Calendar":
@@ -85,7 +86,7 @@ export function MarketingContentPage({ profile }: MarketingContentPageProps) {
         {activeSubModule ? (
           renderActiveSubModule()
         ) : visibleModules.length === 0 ? (
-          <div className="flex items-center justify-center h-48 bg-[#E5E5E5] border border-dashed border-zinc-300 rounded-lg select-none">
+          <div className="flex items-center justify-center h-48 bg-[#F0F4F9] border border-dashed border-slate-200 rounded select-none">
             <span className="font-primary text-sm text-zinc-500 italic">
               No modules assigned. Please contact your administrator.
             </span>

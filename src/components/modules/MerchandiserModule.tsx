@@ -220,14 +220,14 @@ export function TagInput({ tags, onChange, placeholder, suggestions, id, disable
           {tags.map((tag, idx) => (
             <span 
               key={idx} 
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#E5E5E5] border border-zinc-300 font-primary text-xs font-bold text-zinc-800 shadow-2xs hover:bg-zinc-200 transition-colors"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#E8F0FE] border border-transparent font-primary text-xs font-bold text-[#0B57D0] shadow-2xs hover:bg-[#D2E3FC] transition-colors"
             >
               {tag}
               {!disabled && (
                 <button 
                   type="button" 
                   onClick={() => removeTag(idx)}
-                  className="text-zinc-400 hover:text-red-600 focus:outline-none font-bold text-[10px] cursor-pointer"
+                  className="text-[#0B57D0] hover:text-red-600 focus:outline-none font-bold text-[10px] cursor-pointer"
                 >
                   ×
                 </button>
@@ -239,7 +239,7 @@ export function TagInput({ tags, onChange, placeholder, suggestions, id, disable
 
       {/* Input row */}
       {!disabled && (
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           <input
             type="text"
             list={`datalist_${id}`}
@@ -247,15 +247,16 @@ export function TagInput({ tags, onChange, placeholder, suggestions, id, disable
             onChange={(e) => setInputVal(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={placeholder || "Type and press Enter..."}
-            className="flex-1 text-xs bg-[#EEEEEE] border border-zinc-300 rounded-lg px-3 py-2 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
+            className="flex-1 h-8 text-xs bg-[#F0F4F9] border border-slate-200 rounded px-3 text-zinc-900 focus:outline-none focus:border-blue-400 font-semibold"
           />
-          <button
+          <CustomButton
             type="button"
             onClick={() => addTag(inputVal)}
-            className="px-3 py-2 text-xs font-bold bg-[#E5E5E5] hover:bg-zinc-300 border border-zinc-300 rounded-lg text-zinc-800 focus:outline-none cursor-pointer transition-colors"
+            variant="default"
+            className="h-8"
           >
             Add
-          </button>
+          </CustomButton>
         </div>
       )}
 
@@ -1672,26 +1673,26 @@ export function MerchandiserModule({ profile }: { profile?: { role: string; name
           <div className="flex flex-col gap-6 animate-tableFadeInOnly">
             {/* Summary metrics row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-[#EEEEEE] border border-zinc-300 rounded-lg p-5 flex items-center justify-between shadow-2xs hover:scale-[1.01] hover:shadow-xs transition-all duration-200">
+              <div className="bg-white border border-slate-200 rounded p-5 flex items-center justify-between shadow-xs hover:scale-[1.01] hover:shadow-sm transition-all duration-200">
                 <div className="flex flex-col">
                   <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Visits Today</span>
                   <span className="text-3xl font-black text-zinc-950 mt-1">{performanceStats.totals.today}</span>
                 </div>
-                <div className="h-10 w-10 bg-indigo-500/10 rounded-full flex items-center justify-center text-indigo-600 border border-indigo-500/20">
+                <div className="h-10 w-10 bg-[#E8F0FE] rounded flex items-center justify-center text-[#0B57D0] border border-transparent">
                   <Calendar size={18} className="stroke-[2.5]" />
                 </div>
               </div>
 
-              <div className="bg-[#EEEEEE] border border-zinc-300 rounded-lg p-5 flex items-center justify-between shadow-2xs hover:scale-[1.01] hover:shadow-xs transition-all duration-200">
+              <div className="bg-white border border-slate-200 rounded p-5 flex items-center justify-between shadow-xs hover:scale-[1.01] hover:shadow-sm transition-all duration-200">
                 <div className="flex flex-col gap-1">
                   <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Visits Selected Week</span>
                   <span className="text-3xl font-black text-zinc-950 mt-0.5">{performanceStats.totals.week}</span>
-                  <div className="flex items-center gap-1 mt-1 bg-zinc-200/60 rounded px-1.5 py-0.5 w-fit">
+                  <div className="flex items-center gap-1 mt-1 bg-slate-100 rounded px-1.5 py-0.5 w-fit">
                     <button 
                       type="button" 
                       onClick={() => setWeekOffset(prev => Math.max(prev - 1, -52))}
                       disabled={weekOffset === -52}
-                      className="p-0.5 rounded hover:bg-zinc-300 text-zinc-600 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed focus:outline-none"
+                      className="p-0.5 rounded hover:bg-slate-200 text-zinc-600 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed focus:outline-none"
                       title="Previous Week"
                     >
                       <ChevronLeft size={12} className="stroke-[2.5]" />
@@ -1703,28 +1704,28 @@ export function MerchandiserModule({ profile }: { profile?: { role: string; name
                       type="button" 
                       onClick={() => setWeekOffset(prev => Math.min(prev + 1, 0))}
                       disabled={weekOffset === 0}
-                      className="p-0.5 rounded hover:bg-zinc-300 text-zinc-600 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed focus:outline-none"
+                      className="p-0.5 rounded hover:bg-slate-200 text-zinc-600 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed focus:outline-none"
                       title="Next Week"
                     >
                       <ChevronRight size={12} className="stroke-[2.5]" />
                     </button>
                   </div>
                 </div>
-                <div className="h-10 w-10 bg-emerald-500/10 rounded-full flex items-center justify-center text-emerald-600 border border-emerald-500/20">
+                <div className="h-10 w-10 bg-[#E6F4EA] rounded flex items-center justify-center text-[#137333] border border-transparent">
                   <BarChart3 size={18} className="stroke-[2.5]" />
                 </div>
               </div>
 
-              <div className="bg-[#EEEEEE] border border-zinc-300 rounded-lg p-5 flex items-center justify-between shadow-2xs hover:scale-[1.01] hover:shadow-xs transition-all duration-200">
+              <div className="bg-white border border-slate-200 rounded p-5 flex items-center justify-between shadow-xs hover:scale-[1.01] hover:shadow-sm transition-all duration-200">
                 <div className="flex flex-col gap-1">
                   <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Visits Selected Month</span>
                   <span className="text-3xl font-black text-zinc-950 mt-0.5">{performanceStats.totals.month}</span>
-                  <div className="flex items-center gap-1 mt-1 bg-zinc-200/60 rounded px-1.5 py-0.5 w-fit">
+                  <div className="flex items-center gap-1 mt-1 bg-slate-100 rounded px-1.5 py-0.5 w-fit">
                     <button 
                       type="button" 
                       onClick={() => setMonthOffset(prev => Math.max(prev - 1, -12))}
                       disabled={monthOffset === -12}
-                      className="p-0.5 rounded hover:bg-zinc-300 text-zinc-600 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed focus:outline-none"
+                      className="p-0.5 rounded hover:bg-slate-200 text-zinc-600 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed focus:outline-none"
                       title="Previous Month"
                     >
                       <ChevronLeft size={12} className="stroke-[2.5]" />
@@ -1736,24 +1737,24 @@ export function MerchandiserModule({ profile }: { profile?: { role: string; name
                       type="button" 
                       onClick={() => setMonthOffset(prev => Math.min(prev + 1, 0))}
                       disabled={monthOffset === 0}
-                      className="p-0.5 rounded hover:bg-zinc-300 text-zinc-600 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed focus:outline-none"
+                      className="p-0.5 rounded hover:bg-slate-200 text-zinc-600 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed focus:outline-none"
                       title="Next Month"
                     >
                       <ChevronRight size={12} className="stroke-[2.5]" />
                     </button>
                   </div>
                 </div>
-                <div className="h-10 w-10 bg-amber-500/10 rounded-full flex items-center justify-center text-amber-600 border border-amber-500/20">
+                <div className="h-10 w-10 bg-[#FEF7E0] rounded flex items-center justify-center text-[#B06000] border border-transparent">
                   <Calendar size={18} className="stroke-[2.5]" />
                 </div>
               </div>
 
-              <div className="bg-[#EEEEEE] border border-zinc-300 rounded-lg p-5 flex items-center justify-between shadow-2xs hover:scale-[1.01] hover:shadow-xs transition-all duration-200">
+              <div className="bg-white border border-slate-200 rounded p-5 flex items-center justify-between shadow-xs hover:scale-[1.01] hover:shadow-sm transition-all duration-200">
                 <div className="flex flex-col">
                   <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Pending Tasks</span>
                   <span className="text-3xl font-black text-zinc-950 mt-1">{pendingTaskQty}</span>
                 </div>
-                <div className="h-10 w-10 bg-rose-500/10 rounded-full flex items-center justify-center text-rose-600 border border-rose-500/20">
+                <div className="h-10 w-10 bg-[#FCE8E6] rounded flex items-center justify-center text-[#C5221F] border border-transparent">
                   <ClipboardCheck size={18} className="stroke-[2.5]" />
                 </div>
               </div>
@@ -1762,15 +1763,15 @@ export function MerchandiserModule({ profile }: { profile?: { role: string; name
             {/* Main breakdown grids */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               {/* Retailer Breakdown table */}
-              <div className="lg:col-span-5 bg-[#EEEEEE] border border-zinc-300 rounded-lg overflow-hidden shadow-2xs">
-                <div className="px-4 py-3 bg-[#E5E5E5] border-b border-zinc-300 flex items-center gap-2">
+              <div className="lg:col-span-5 bg-white border border-slate-200 rounded overflow-hidden shadow-xs">
+                <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
                   <UsersIcon size={14} className="text-zinc-600" />
                   <span className="font-bold text-xs text-zinc-700 uppercase tracking-wider">Visits per Retailer</span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
-                      <tr className="border-b border-zinc-300 bg-[#E5E5E5]/40 font-bold text-zinc-600">
+                      <tr className="border-b border-slate-200 bg-slate-50/50 font-bold text-zinc-600">
                         <th className="py-2.5 px-4">Retailer</th>
                         <th className="py-2.5 px-4 text-center">Today</th>
                         <th className="py-2.5 px-4 text-center">Week</th>
@@ -1780,7 +1781,7 @@ export function MerchandiserModule({ profile }: { profile?: { role: string; name
                     <tbody className="divide-y divide-zinc-200">
                       {performanceStats.retailers.length > 0 ? (
                         performanceStats.retailers.map((r, idx) => (
-                          <tr key={idx} className="hover:bg-[#E5E5E5]/30 transition-colors">
+                          <tr key={idx} className="hover:bg-slate-50 transition-colors">
                             <td className="py-2.5 px-4 font-semibold text-zinc-800">{r.name}</td>
                             <td className="py-2.5 px-4 text-center font-bold text-zinc-700">{r.today}</td>
                             <td className="py-2.5 px-4 text-center font-bold text-zinc-700">{r.week}</td>
@@ -1800,8 +1801,8 @@ export function MerchandiserModule({ profile }: { profile?: { role: string; name
               </div>
 
               {/* Monthly Grouped Bar Chart converted to Line Chart */}
-              <div className="lg:col-span-7 bg-[#EEEEEE] border border-zinc-300 rounded-lg p-4 shadow-2xs relative flex flex-col gap-3 min-h-[360px]">
-                <div className="flex items-center justify-between border-b border-zinc-300 pb-2">
+              <div className="lg:col-span-7 bg-white border border-slate-200 rounded p-4 shadow-xs relative flex flex-col gap-3 min-h-[360px]">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                   <div className="flex items-center gap-2">
                     <BarChart3 size={14} className="text-zinc-600" />
                     <span className="font-bold text-xs text-zinc-700 uppercase tracking-wider">12-Month Performance Comparison</span>
@@ -1972,10 +1973,10 @@ export function MerchandiserModule({ profile }: { profile?: { role: string; name
         )}
 
         {activeTab === "setting" && (
-          <div className="bg-[#EEEEEE] border border-zinc-300 rounded-lg p-6 shadow-2xs max-w-6xl mx-auto animate-tableFadeInOnly grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div className="bg-white border border-slate-200 rounded p-6 shadow-xs max-w-6xl mx-auto animate-tableFadeInOnly grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* Left Column - Setting Values */}
             <div className="lg:col-span-5 flex flex-col gap-5">
-              <div className="flex items-center gap-2 border-b border-zinc-300 pb-2">
+              <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
                 <Settings2 size={16} className="text-zinc-700" />
                 <h3 className="font-bold text-sm text-zinc-800 uppercase tracking-wider">Deploy System Configuration</h3>
               </div>
@@ -1989,7 +1990,7 @@ export function MerchandiserModule({ profile }: { profile?: { role: string; name
                     value={settingFreq}
                     onChange={(e) => setSettingFreq(Math.max(Number(e.target.value), 1))}
                     placeholder="e.g. 14"
-                    className="w-full text-xs bg-[#EEEEEE] border border-zinc-300 rounded-lg px-3 py-2 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="w-full text-xs bg-[#F0F4F9] border border-slate-200 rounded px-3 py-2 text-zinc-900 focus:outline-none focus:border-blue-400 font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -2055,46 +2056,45 @@ export function MerchandiserModule({ profile }: { profile?: { role: string; name
             </div>
 
             {/* Right Column - Calculations */}
-            <div className="lg:col-span-7 bg-[#E5E5E5]/45 border border-zinc-300 rounded-lg p-5 flex flex-col gap-5">
-              <div className="flex items-center justify-between border-b border-zinc-300 pb-2">
+            <div className="lg:col-span-7 bg-[#F8F9FC] border border-slate-200 rounded p-5 flex flex-col gap-5">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                 <div className="flex items-center gap-2">
-                  <BarChart3 size={16} className="text-zinc-700" strokeWidth={2} />
+                  <BarChart3 size={16} className="text-[#0B57D0]" strokeWidth={2} />
                   <h3 className="font-bold text-sm text-zinc-800 uppercase tracking-wider">Live Metrics Preview</h3>
                 </div>
-                <span className="text-[10px] font-bold text-zinc-500 bg-zinc-200/80 px-2 py-0.5 rounded-full select-none">
+                <span className="text-[10px] font-bold text-[#0B57D0] bg-[#E8F0FE] px-2 py-0.5 rounded select-none">
                   Simulated Impact
                 </span>
               </div>
 
               {/* Summary counters */}
               <div className="grid grid-cols-3 gap-3">
-                <div className="bg-[#EEEEEE] border border-zinc-300 rounded-md p-3.5 flex flex-col gap-0.5 shadow-3xs">
+                <div className="bg-white border border-slate-200 rounded p-3.5 flex flex-col gap-0.5 shadow-3xs">
                   <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider text-center lg:text-left">Active Stores</span>
                   <span className="text-xl font-black text-zinc-950 text-center lg:text-left">{settingCalculation.totalActive}</span>
                 </div>
-                <div className="bg-[#EEEEEE] border border-zinc-300 rounded-md p-3.5 flex flex-col gap-0.5 shadow-3xs">
+                <div className="bg-white border border-slate-200 rounded p-3.5 flex flex-col gap-0.5 shadow-3xs">
                   <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider text-center lg:text-left">Have Visited</span>
                   <span className="text-xl font-black text-emerald-700 text-center lg:text-left">{settingCalculation.totalVisited}</span>
                 </div>
-                <div className="bg-[#EEEEEE] border border-zinc-300 rounded-md p-3.5 flex flex-col gap-0.5 shadow-3xs">
+                <div className="bg-white border border-slate-200 rounded p-3.5 flex flex-col gap-0.5 shadow-3xs">
                   <span className="text-[9px] font-bold text-amber-600 uppercase tracking-wider text-center lg:text-left">Pending Visit</span>
                   <span className="text-xl font-black text-amber-700 text-center lg:text-left">{settingCalculation.totalPending}</span>
                 </div>
               </div>
-
               {/* Switcher & Table */}
               <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider">Group breakdown</span>
                   
                   {/* Switch group button group */}
-                  <div className="flex bg-zinc-200 p-0.5 rounded border border-zinc-300/60">
+                  <div className="flex bg-slate-100 p-0.5 rounded border border-slate-200">
                     <button
                       type="button"
                       onClick={() => setCalcGroupBy("zone")}
                       className={`px-3 py-1 text-[9px] font-bold rounded transition-all cursor-pointer ${
                         calcGroupBy === "zone"
-                          ? "bg-[#EEEEEE] text-zinc-950 shadow-3xs"
+                          ? "bg-white text-zinc-950 shadow-xs"
                           : "text-zinc-500 hover:text-zinc-800"
                       }`}
                     >
@@ -2105,7 +2105,7 @@ export function MerchandiserModule({ profile }: { profile?: { role: string; name
                       onClick={() => setCalcGroupBy("retailer")}
                       className={`px-3 py-1 text-[9px] font-bold rounded transition-all cursor-pointer ${
                         calcGroupBy === "retailer"
-                          ? "bg-[#EEEEEE] text-zinc-950 shadow-3xs"
+                          ? "bg-white text-zinc-950 shadow-xs"
                           : "text-zinc-500 hover:text-zinc-800"
                       }`}
                     >
@@ -2113,12 +2113,12 @@ export function MerchandiserModule({ profile }: { profile?: { role: string; name
                     </button>
                   </div>
                 </div>
-
+ 
                 {/* Table Breakdown */}
-                <div className="bg-[#EEEEEE] border border-zinc-300 rounded-md overflow-hidden shadow-3xs max-h-[220px] overflow-y-auto">
+                <div className="bg-white border border-slate-200 rounded overflow-hidden shadow-3xs max-h-[220px] overflow-y-auto">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
-                      <tr className="border-b border-zinc-300 bg-[#E5E5E5]/60 font-bold text-zinc-600">
+                      <tr className="border-b border-slate-200 bg-slate-50 font-bold text-zinc-600">
                         <th className="py-2 px-3">{calcGroupBy === "zone" ? "Store Zone" : "Retailer Name"}</th>
                         <th className="py-2 px-3 text-center">Total</th>
                         <th className="py-2 px-3 text-center text-emerald-700 font-bold">Visited</th>
@@ -2129,7 +2129,7 @@ export function MerchandiserModule({ profile }: { profile?: { role: string; name
                       {calcGroupBy === "zone" ? (
                         settingCalculation.byZone.length > 0 ? (
                           settingCalculation.byZone.map((z, idx) => (
-                            <tr key={idx} className="hover:bg-zinc-200/50 transition-colors">
+                            <tr key={idx} className="hover:bg-slate-50 transition-colors">
                               <td className="py-2 px-3 font-semibold text-zinc-800">{z.name}</td>
                               <td className="py-2 px-3 text-center font-bold text-zinc-700">{z.total}</td>
                               <td className="py-2 px-3 text-center font-bold text-emerald-600">{z.visited}</td>
@@ -2146,7 +2146,7 @@ export function MerchandiserModule({ profile }: { profile?: { role: string; name
                       ) : (
                         settingCalculation.byRetailer.length > 0 ? (
                           settingCalculation.byRetailer.map((r, idx) => (
-                            <tr key={idx} className="hover:bg-zinc-200/50 transition-colors">
+                            <tr key={idx} className="hover:bg-slate-50 transition-colors">
                               <td className="py-2 px-3 font-semibold text-zinc-800">{r.name}</td>
                               <td className="py-2 px-3 text-center font-bold text-zinc-700">{r.total}</td>
                               <td className="py-2 px-3 text-center font-bold text-emerald-600">{r.visited}</td>

@@ -107,11 +107,10 @@ function SearchableSelect({ options, value, onChange, placeholder, disabled = fa
         onFocus={() => {
           if (!disabled) setIsOpen(true);
         }}
-        placeholder={placeholder}
-        className={`w-full bg-zinc-50 border border-zinc-300 rounded-lg h-8 px-2.5 text-zinc-900 font-medium text-xs focus:outline-none focus:border-zinc-400 disabled:opacity-50 ${className}`}
+        className={`w-full bg-[#F0F4F9] border border-slate-200 rounded h-8 px-2.5 text-zinc-900 font-medium text-xs focus:outline-none focus:border-blue-400 disabled:opacity-50 ${className}`}
       />
       {isOpen && !disabled && (
-        <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white border border-zinc-300 rounded-lg shadow-lg z-30 text-xs text-left">
+        <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white border border-slate-200 rounded shadow-lg z-30 text-xs text-left">
           {filteredOptions.length === 0 ? (
             <div className="p-2.5 text-zinc-400 italic">No matches found</div>
           ) : (
@@ -398,7 +397,9 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
     }
     setSponsoredCatalogId(item.id);
     setSponsoredBy(item.sponsoredBy || "");
-    const brand = brandsList.find(b => b["Display Name"] === item.brandName);
+    const brand = brandsList.find(b => 
+      b["Display Name"]?.trim().toLowerCase() === item.brandName?.trim().toLowerCase()
+    );
     setSelectedBrand(brand ? String(brand.ID) : item.brandName);
     setSelectedProductSku(item.sku);
     setIsCatalogFormOpen(true);
@@ -1400,7 +1401,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
 
   const catalogColumns: Column[] = React.useMemo(() => [
     { id: "sponsoredBy", header: "Sponsored By", accessor: "sponsoredBy" },
-    { id: "brandName", header: "Brand Owner", accessor: "brandName" },
+    { id: "brandName", header: "Brands", accessor: "brandName" },
     { id: "sku", header: "SKU", accessor: "sku" },
     { id: "productName", header: "Product Name", accessor: "productName" },
     { id: "uom", header: "UOM (Pcs/Ctn)", accessor: "uom" },
@@ -1547,8 +1548,8 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="bg-white border border-zinc-300/40 rounded-xl p-5 shadow-sm flex items-center gap-4">
-              <div className="p-3 bg-zinc-100 text-zinc-800 rounded-full border border-zinc-200">
+            <div className="bg-white border border-slate-200 rounded p-5 shadow-xs flex items-center gap-4">
+              <div className="p-3 bg-[#F0F4F9] text-[#041E49] rounded border border-transparent">
                 <TrendingUp size={22} className="stroke-[2.5]" />
               </div>
               <div>
@@ -1556,8 +1557,8 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                 <p className="text-2xl font-bold text-zinc-900 mt-0.5">{Math.round(dashboardStats.totalCartons)}</p>
               </div>
             </div>
-            <div className="bg-white border border-zinc-300/40 rounded-xl p-5 shadow-sm flex items-center gap-4">
-              <div className="p-3 bg-zinc-100 text-zinc-800 rounded-full border border-zinc-200">
+            <div className="bg-white border border-slate-200 rounded p-5 shadow-xs flex items-center gap-4">
+              <div className="p-3 bg-[#F0F4F9] text-[#041E49] rounded border border-transparent">
                 <FileText size={22} className="stroke-[2.5]" />
               </div>
               <div>
@@ -1565,8 +1566,8 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                 <p className="text-2xl font-bold text-zinc-900 mt-0.5">{dashboardStats.totalTransactions}</p>
               </div>
             </div>
-            <div className="bg-white border border-zinc-300/40 rounded-xl p-5 shadow-sm flex items-center gap-4">
-              <div className="p-3 bg-zinc-100 text-zinc-800 rounded-full border border-zinc-200">
+            <div className="bg-white border border-slate-200 rounded p-5 shadow-xs flex items-center gap-4">
+              <div className="p-3 bg-[#F0F4F9] text-[#041E49] rounded border border-transparent">
                 <Users size={22} className="stroke-[2.5]" />
               </div>
               <div>
@@ -1574,8 +1575,8 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                 <p className="text-2xl font-bold text-zinc-900 mt-0.5">{receivers.length}</p>
               </div>
             </div>
-            <div className="bg-white border border-zinc-300/40 rounded-xl p-5 shadow-sm flex items-center gap-4">
-              <div className="p-3 bg-zinc-100 text-zinc-800 rounded-full border border-zinc-200">
+            <div className="bg-white border border-slate-200 rounded p-5 shadow-xs flex items-center gap-4">
+              <div className="p-3 bg-[#F0F4F9] text-[#041E49] rounded border border-transparent">
                 <Coins size={22} className="stroke-[2.5]" />
               </div>
               <div>
@@ -1651,7 +1652,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                       }}
                       required
                       disabled={userRole === "viewer"}
-                      className="w-full text-xs bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 font-semibold focus:outline-none focus:border-zinc-400 h-10"
+                      className="w-full text-xs bg-[#F0F4F9] border border-slate-200 rounded p-2.5 text-zinc-900 font-semibold focus:outline-none focus:border-blue-400 h-10"
                     >
                       <option value="" disabled>Select Sponsor...</option>
                       {uniqueCatalogSponsors.map(sponsor => (
@@ -1670,7 +1671,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                         placeholder="e.g. DOC-8823"
                         required
                         disabled={userRole === "viewer"}
-                        className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
+                        className="w-full bg-[#F0F4F9] border border-slate-200 rounded p-2.5 text-zinc-900 focus:outline-none focus:border-blue-400 font-semibold"
                       />
                     </div>
                     <div>
@@ -1681,7 +1682,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                         onChange={(e) => setTxDate(e.target.value)}
                         required
                         disabled={userRole === "viewer"}
-                        className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
+                        className="w-full bg-[#F0F4F9] border border-slate-200 rounded p-2.5 text-zinc-900 focus:outline-none focus:border-blue-400 font-semibold"
                       />
                     </div>
                   </div>
@@ -1774,7 +1775,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                       onChange={(e) => setTxRemark(e.target.value)}
                       placeholder="Optional notes"
                       disabled={userRole === "viewer"}
-                      className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold resize-none text-xs"
+                      className="w-full bg-[#F0F4F9] border border-slate-200 rounded p-2.5 text-zinc-900 focus:outline-none focus:border-blue-400 font-semibold resize-none text-xs"
                     />
                   </div>
                   <div className="flex gap-2 mt-2">
@@ -1846,11 +1847,11 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                       placeholder="e.g. HSG Global"
                       required
                       disabled={userRole === "viewer"}
-                      className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
+                      className="w-full bg-[#F0F4F9] border border-slate-200 rounded p-2.5 text-zinc-900 focus:outline-none focus:border-blue-400 font-semibold"
                     />
                   </div>
                   <div>
-                    <label className="block mb-1 text-zinc-500 font-bold uppercase">Brand Owner</label>
+                    <label className="block mb-1 text-zinc-500 font-bold uppercase">Brands</label>
                     <SearchableSelect
                       options={brandOptions}
                       value={selectedBrand}
@@ -1858,7 +1859,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                         setSelectedBrand(val);
                         setSelectedProductSku("");
                       }}
-                      placeholder="Search and select brand owner..."
+                      placeholder="Search and select brand..."
                       disabled={userRole === "viewer"}
                     />
                   </div>
@@ -1962,7 +1963,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                       placeholder="e.g. Red Cross Charity"
                       required
                       disabled={userRole === "viewer"}
-                      className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
+                      className="w-full bg-[#F0F4F9] border border-slate-200 rounded p-2.5 text-zinc-900 focus:outline-none focus:border-blue-400 font-semibold"
                     />
                   </div>
                   <div>
@@ -1972,7 +1973,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                       onChange={(e) => setRecType(e.target.value as any)}
                       required
                       disabled={userRole === "viewer"}
-                      className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 font-semibold focus:outline-none focus:border-zinc-400"
+                      className="w-full bg-[#F0F4F9] border border-slate-200 rounded p-2.5 text-zinc-900 font-semibold focus:outline-none focus:border-blue-400"
                     >
                       <option value="monthly">Monthly Limit</option>
                       <option value="onetime">One-Time Take</option>
@@ -1990,7 +1991,7 @@ export function SponsorshipModule({ profile }: SponsorshipModuleProps) {
                         required
                         min={1}
                         disabled={userRole === "viewer"}
-                        className="w-full bg-zinc-50 border border-zinc-300 rounded-lg p-2.5 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
+                        className="w-full bg-[#F0F4F9] border border-slate-200 rounded p-2.5 text-zinc-900 focus:outline-none focus:border-blue-400 font-semibold"
                       />
                       <p className="text-[10px] text-zinc-400 font-medium mt-1">
                         Transactions are logged in pieces, but limits are tracked in cartons.

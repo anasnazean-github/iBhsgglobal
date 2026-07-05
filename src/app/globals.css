@@ -130,6 +130,10 @@
   html {
     @apply font-sans;
   }
+  button, button:focus, button:active, button:hover, button:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+  }
 }
 
 @keyframes progress-slide {

@@ -27,12 +27,12 @@ interface StoresDatabaseModuleProps {
 
 export function StoresDatabaseModule({ profile }: StoresDatabaseModuleProps) {
   const tabs = [
-    { id: "retailers", label: "Retailers", desc: "Manage retailer profiles, brand association, and logo assets." },
-    { id: "stores", label: "Stores", desc: "Manage store locations, address mappings, and associated retailers." }
+    { id: "stores", label: "Stores", desc: "Manage store locations, address mappings, and associated retailers." },
+    { id: "retailers", label: "Retailers", desc: "Manage retailer profiles, brand association, and logo assets." }
   ];
-  const [activeTab, setActiveTab] = React.useState<"retailers" | "stores">("retailers");
+  const [activeTab, setActiveTab] = React.useState<"retailers" | "stores">("stores");
   const [data, setData] = React.useState<any[]>([]);
-  const [columns, setColumns] = React.useState<Column[]>(defaultRetailerColumns);
+  const [columns, setColumns] = React.useState<Column[]>(defaultStoreColumns);
   const [fetching, setFetching] = React.useState(false);
   const [syncStatus, setSyncStatus] = React.useState<"idle" | "syncing" | "synced">("idle");
   const [isEditMode, setIsEditMode] = React.useState(false);
@@ -456,8 +456,8 @@ function RetailerEditForm({ retailer, onSave, onCancel }: { retailer: any; onSav
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-[0.5px] flex items-center justify-center z-50 font-primary">
-      <div className="bg-[#EEEEEE] border border-zinc-300 w-full max-w-md rounded-lg p-6 shadow-xl flex flex-col gap-4 animate-tableFadeIn animate-duration-200">
-        <div className="flex justify-between items-center pb-2 border-b border-zinc-300">
+      <div className="bg-white border border-slate-200 w-full max-w-md rounded-lg p-6 shadow-xl flex flex-col gap-4 animate-tableFadeIn animate-duration-200">
+        <div className="flex justify-between items-center pb-2 border-b border-slate-200">
           <h3 className="text-sm font-bold text-zinc-950 uppercase tracking-wider">{isNew ? "Add Retailer" : "Edit Retailer"}</h3>
           <button onClick={onCancel} className="text-zinc-400 hover:text-zinc-800 focus:outline-none cursor-pointer">
             <X size={16} />
@@ -472,10 +472,10 @@ function RetailerEditForm({ retailer, onSave, onCancel }: { retailer: any; onSav
               disabled={!isNew}
               onChange={(e) => handleChange("ID", e.target.value)}
               required
-              className={`w-full text-xs rounded-lg px-3 py-2 font-semibold outline-none border ${
+              className={`w-full text-xs rounded px-3 py-2 font-semibold outline-none border ${
                 !isNew 
-                  ? "bg-[#E5E5E5] border-zinc-300 text-zinc-500 cursor-not-allowed" 
-                  : "bg-[#EEEEEE] border-zinc-300 text-zinc-900 focus-border-zinc-400"
+                  ? "bg-[#F0F4F9] border-slate-200 text-zinc-500 cursor-not-allowed" 
+                  : "bg-[#F0F4F9] border-slate-200 text-zinc-900 focus:border-blue-400"
               }`}
             />
           </div>
@@ -486,7 +486,7 @@ function RetailerEditForm({ retailer, onSave, onCancel }: { retailer: any; onSav
               value={formData["Display Name"] || ""}
               onChange={(e) => handleChange("Display Name", e.target.value)}
               required
-              className="w-full text-xs bg-[#EEEEEE] border border-zinc-300 rounded-lg px-3 py-2 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
+              className="w-full text-xs bg-[#F0F4F9] border border-slate-200 rounded px-3 py-2 text-zinc-900 focus:outline-none focus:border-blue-400 font-semibold"
             />
           </div>
           <div className="flex flex-col gap-1.5">
@@ -497,7 +497,7 @@ function RetailerEditForm({ retailer, onSave, onCancel }: { retailer: any; onSav
                 value={formData["Logo Image"] || ""}
                 onChange={(e) => handleChange("Logo Image", e.target.value)}
                 placeholder="Image URL or upload a file"
-                className="flex-1 text-xs bg-[#EEEEEE] border border-zinc-300 rounded-lg px-3 py-2 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
+                className="flex-1 text-xs bg-[#F0F4F9] border border-slate-200 rounded px-3 py-2 text-zinc-900 focus:outline-none focus:border-blue-400 font-semibold"
               />
               <input
                 type="file"
@@ -510,14 +510,14 @@ function RetailerEditForm({ retailer, onSave, onCancel }: { retailer: any; onSav
                 type="button"
                 disabled={uploading}
                 onClick={() => fileInputRef.current?.click()}
-                className="h-8 px-3 text-xs font-bold rounded border border-zinc-300 bg-[#E5E5E5] hover:bg-[#DCDCDC] text-zinc-700 hover:text-zinc-950 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all shadow-sm"
+                className="h-8 px-3 text-xs font-bold rounded border border-slate-200 bg-white hover:bg-slate-100 text-zinc-700 hover:text-zinc-950 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all shadow-xs"
               >
                 <Upload size={13} />
                 {uploading ? "Uploading..." : "Upload"}
               </button>
             </div>
             {formData["Logo Image"] && (
-              <div className="mt-1.5 border border-zinc-300 rounded-lg overflow-hidden h-20 bg-zinc-200 flex items-center justify-center relative group">
+              <div className="mt-1.5 border border-slate-200 rounded overflow-hidden h-20 bg-[#F0F4F9] flex items-center justify-center relative group">
                 <img src={formData["Logo Image"]} alt="Preview" className="max-h-full max-w-full object-contain" />
               </div>
             )}
@@ -533,22 +533,22 @@ function RetailerEditForm({ retailer, onSave, onCancel }: { retailer: any; onSav
                   type="text"
                   value={formData[key] !== undefined ? formData[key] : ""}
                   onChange={(e) => handleChange(key, e.target.value)}
-                  className="w-full text-xs bg-[#EEEEEE] border border-zinc-300 rounded-lg px-3 py-2 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
+                  className="w-full text-xs bg-[#F0F4F9] border border-slate-200 rounded px-3 py-2 text-zinc-900 focus:outline-none focus:border-blue-400 font-semibold"
                 />
               </div>
             ))}
-
-          <div className="flex justify-end gap-2.5 pt-3 border-t border-zinc-300 mt-2">
+ 
+          <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-200 mt-2">
             <button
               type="button"
               onClick={onCancel}
-              className="h-8 px-4 text-xs font-bold rounded border border-zinc-300 bg-[#E5E5E5] hover:bg-[#DCDCDC] text-zinc-700 hover:text-zinc-950 transition-all cursor-pointer shadow-sm"
+              className="h-8 px-4 text-xs font-bold rounded border border-slate-200 bg-white text-zinc-700 hover:text-zinc-950 hover:bg-slate-100 transition-all cursor-pointer shadow-xs"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="h-8 px-4 text-xs font-bold rounded border border-zinc-900 bg-zinc-800 hover:bg-zinc-900 text-[#EEEEEE] transition-all cursor-pointer shadow-sm"
+              className="h-8 px-4 text-xs font-bold rounded border border-[#0B57D0] bg-[#0B57D0] hover:bg-[#0842A0] text-white transition-all cursor-pointer shadow-xs"
             >
               Save
             </button>
@@ -617,8 +617,8 @@ function StoreEditForm({ store, retailers, onSave, onCancel }: { store: any; ret
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-[0.5px] flex items-center justify-center z-50 font-primary">
-      <div className="bg-[#EEEEEE] border border-zinc-300 w-full max-w-xl rounded-lg p-6 shadow-xl flex flex-col gap-4 animate-tableFadeIn animate-duration-200 max-h-[90vh] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-        <div className="flex justify-between items-center pb-2 border-b border-zinc-300">
+      <div className="bg-white border border-slate-200 w-full max-w-xl rounded-lg p-6 shadow-xl flex flex-col gap-4 animate-tableFadeIn animate-duration-200 max-h-[90vh] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <div className="flex justify-between items-center pb-2 border-b border-slate-200">
           <h3 className="text-sm font-bold text-zinc-950 uppercase tracking-wider">{isNew ? "Add Store" : "Edit Store"}</h3>
           <button onClick={onCancel} className="text-zinc-400 hover:text-zinc-800 focus:outline-none cursor-pointer">
             <X size={16} />
@@ -633,10 +633,10 @@ function StoreEditForm({ store, retailers, onSave, onCancel }: { store: any; ret
               disabled={!isNew}
               onChange={(e) => handleChange("ID", e.target.value)}
               required
-              className={`w-full text-xs rounded-lg px-3 py-2 font-semibold outline-none border ${
+              className={`w-full text-xs rounded px-3 py-2 font-semibold outline-none border ${
                 !isNew 
-                  ? "bg-[#E5E5E5] border-zinc-300 text-zinc-500 cursor-not-allowed" 
-                  : "bg-[#EEEEEE] border-zinc-300 text-zinc-900 focus:border-zinc-400"
+                  ? "bg-slate-50 border-slate-200 text-zinc-500 cursor-not-allowed" 
+                  : "bg-white border-slate-300 text-zinc-900 focus:border-blue-500"
               }`}
             />
           </div>
@@ -647,7 +647,7 @@ function StoreEditForm({ store, retailers, onSave, onCancel }: { store: any; ret
               value={formData[retailerIdKey] || ""}
               onChange={(e) => handleRetailerChange(e.target.value)}
               required
-              className="w-full text-xs bg-[#EEEEEE] border border-zinc-300 rounded-lg px-3 py-2 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold cursor-pointer"
+              className="w-full text-xs bg-white border border-slate-300 rounded px-3 py-2 text-zinc-900 focus:outline-none focus:border-blue-500 font-semibold cursor-pointer"
             >
               <option value="">-- Select Retailer --</option>
               {retailers.map((r) => (
@@ -665,7 +665,7 @@ function StoreEditForm({ store, retailers, onSave, onCancel }: { store: any; ret
               value={formData["Display Name"] || ""}
               onChange={(e) => handleChange("Display Name", e.target.value)}
               required
-              className="w-full text-xs bg-[#EEEEEE] border border-zinc-300 rounded-lg px-3 py-2 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
+              className="w-full text-xs bg-white border border-slate-300 rounded px-3 py-2 text-zinc-900 focus:outline-none focus:border-blue-500 font-semibold"
             />
           </div>
 
@@ -675,7 +675,7 @@ function StoreEditForm({ store, retailers, onSave, onCancel }: { store: any; ret
               value={formData["Address"] || ""}
               onChange={(e) => handleChange("Address", e.target.value)}
               rows={2}
-              className="w-full text-xs bg-[#EEEEEE] border border-zinc-300 rounded-lg px-3 py-2 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold resize-none"
+              className="w-full text-xs bg-white border border-slate-300 rounded px-3 py-2 text-zinc-900 focus:outline-none focus:border-blue-500 font-semibold resize-none"
             />
           </div>
 
@@ -688,7 +688,7 @@ function StoreEditForm({ store, retailers, onSave, onCancel }: { store: any; ret
                   value={formData[imgKey] || ""}
                   onChange={(e) => handleChange(imgKey, e.target.value)}
                   placeholder="Image URL or upload a file"
-                  className="flex-1 text-xs bg-[#EEEEEE] border border-zinc-300 rounded-lg px-3 py-2 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
+                  className="flex-1 text-xs bg-[#F0F4F9] border border-slate-200 rounded px-3 py-2 text-zinc-900 focus:outline-none focus:border-blue-400 font-semibold"
                 />
                 <input
                   type="file"
@@ -701,14 +701,14 @@ function StoreEditForm({ store, retailers, onSave, onCancel }: { store: any; ret
                   type="button"
                   disabled={uploading}
                   onClick={() => fileInputRef.current?.click()}
-                  className="h-8 px-3 text-xs font-bold rounded border border-zinc-300 bg-[#E5E5E5] hover:bg-[#DCDCDC] text-zinc-700 hover:text-zinc-950 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all shadow-sm"
+                  className="h-8 px-3 text-xs font-bold rounded border border-slate-200 bg-white hover:bg-slate-100 text-zinc-700 hover:text-zinc-950 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all shadow-xs"
                 >
                   <Upload size={13} />
                   {uploading ? "Uploading..." : "Upload"}
                 </button>
               </div>
               {formData[imgKey] && (
-                <div className="mt-1.5 border border-zinc-300 rounded-lg overflow-hidden h-24 bg-zinc-200 flex items-center justify-center relative group">
+                <div className="mt-1.5 border border-slate-200 rounded overflow-hidden h-24 bg-[#F0F4F9] flex items-center justify-center relative group">
                   <img src={formData[imgKey]} alt="Preview" className="max-h-full max-w-full object-contain" />
                 </div>
               )}
@@ -725,22 +725,22 @@ function StoreEditForm({ store, retailers, onSave, onCancel }: { store: any; ret
                   type="text"
                   value={formData[key] !== undefined ? formData[key] : ""}
                   onChange={(e) => handleChange(key, e.target.value)}
-                  className="w-full text-xs bg-[#EEEEEE] border border-zinc-300 rounded-lg px-3 py-2 text-zinc-900 focus:outline-none focus:border-zinc-400 font-semibold"
+                  className="w-full text-xs bg-[#F0F4F9] border border-slate-200 rounded px-3 py-2 text-zinc-900 focus:outline-none focus:border-blue-400 font-semibold"
                 />
               </div>
             ))}
 
-          <div className="flex justify-end gap-2.5 pt-3 border-t border-zinc-300 mt-2 col-span-2">
+          <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-200 mt-2 col-span-2">
             <button
               type="button"
               onClick={onCancel}
-              className="h-8 px-4 text-xs font-bold rounded border border-zinc-300 bg-[#E5E5E5] hover:bg-[#DCDCDC] text-zinc-700 hover:text-zinc-950 transition-all cursor-pointer shadow-sm"
+              className="h-8 px-4 text-xs font-bold rounded border border-slate-200 bg-white text-zinc-700 hover:text-zinc-950 hover:bg-slate-100 transition-all cursor-pointer shadow-xs"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="h-8 px-4 text-xs font-bold rounded border border-zinc-900 bg-zinc-800 hover:bg-zinc-900 text-[#EEEEEE] transition-all cursor-pointer shadow-sm"
+              className="h-8 px-4 text-xs font-bold rounded border border-[#0B57D0] bg-[#0B57D0] hover:bg-[#0842A0] text-white transition-all cursor-pointer shadow-xs"
             >
               Save
             </button>

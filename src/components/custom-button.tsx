@@ -9,24 +9,24 @@ interface CustomButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement
 
 export function CustomButton({ variant = "default", children, className = "", ...props }: CustomButtonProps) {
   // Height is exactly h-8 (32px), Corner Radius is rounded (4px)
-  const baseStyle = "h-8 px-4 text-xs font-bold rounded border shadow-sm flex items-center justify-center gap-1.5 transition-all select-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-zinc-400 disabled:opacity-50 disabled:pointer-events-none";
+  const baseStyle = "h-8 px-4 text-xs font-bold rounded border shadow-xs flex items-center justify-center gap-1.5 transition-all select-none cursor-pointer outline-none focus:outline-none focus:ring-0 disabled:opacity-50 disabled:pointer-events-none";
   
   let variantStyle = "";
   if (variant === "default") {
-    // Neutral EEEEEE button
-    variantStyle = "bg-[#EEEEEE] border-zinc-300 text-zinc-700 hover:text-zinc-950 hover:bg-[#E5E5E5]/20";
+    // Neutral white button with thin slate border
+    variantStyle = "bg-white border-slate-200 text-zinc-700 hover:text-zinc-950 hover:bg-slate-50";
   } else if (variant === "secondary") {
-    // Neutral E5E5E5 button
-    variantStyle = "bg-[#E5E5E5] border-zinc-300 text-zinc-700 hover:text-zinc-950 hover:bg-[#EEEEEE]/50";
+    // Google soft light-blue button (like "Execution log")
+    variantStyle = "bg-[#E8F0FE] border-transparent text-[#0B57D0] hover:bg-[#D2E3FC] hover:text-[#0842A0] shadow-none";
   } else if (variant === "dark") {
-    // Dark zinc button
-    variantStyle = "bg-zinc-800 border-zinc-900 text-[#EEEEEE] hover:bg-zinc-900 hover:text-white";
+    // Google solid primary blue button (like "Deploy")
+    variantStyle = "bg-[#0B57D0] border-transparent text-white hover:bg-[#0842A0] hover:text-white";
   } else if (variant === "danger") {
-    // Rose border/warning button
-    variantStyle = "bg-[#EEEEEE] border-zinc-300 text-red-600 hover:text-red-700 hover:bg-red-50";
+    // Google soft danger/warning button (like "Reset")
+    variantStyle = "bg-[#FCE8E6] border-transparent text-[#C5221F] hover:bg-[#FAD2CF] hover:text-[#B0120A] shadow-none";
   } else if (variant === "ghost") {
     // Transparent background, borderless, shadowless button
-    variantStyle = "bg-transparent border-transparent text-zinc-700 hover:text-zinc-950 hover:bg-zinc-100 shadow-none";
+    variantStyle = "bg-transparent border-transparent text-zinc-700 hover:text-zinc-950 hover:bg-slate-50 shadow-none";
   }
 
   return (

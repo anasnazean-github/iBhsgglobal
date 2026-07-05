@@ -42,8 +42,8 @@ export function NavigationTabs({
               onClick={() => onTabSelect(tab.id)}
               className={`px-6 py-2.5 font-primary text-sm font-bold border-b-2 transition-all duration-200 cursor-pointer ${
                 activeTabId === tab.id
-                  ? "border-zinc-950 text-zinc-950"
-                  : "border-transparent text-zinc-400 hover:text-zinc-700"
+                  ? "border-[#0B57D0] text-[#0B57D0]"
+                  : "border-transparent text-[#474747] hover:text-[#1F1F1F]"
               }`}
             >
               {tab.label}

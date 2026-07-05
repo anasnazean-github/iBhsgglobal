@@ -16,18 +16,18 @@ export const MenuButton = React.forwardRef<HTMLButtonElement, MenuButtonProps>(
       <button
         ref={ref}
         className={cn(
-          "flex items-center rounded py-3 text-sm font-medium transition-all duration-200 ease-in-out font-primary select-none outline-none",
-          isCollapsed ? "w-10 h-10 justify-center mx-auto px-0" : "w-full gap-3 px-4 text-left",
-          "text-zinc-700 hover:text-zinc-900 focus-visible:text-zinc-900",
-          "hover:bg-[#EEEEEE] hover:shadow-sm",
-          "focus-visible:bg-[#EEEEEE] focus-visible:shadow-sm focus-visible:ring-2 focus-visible:ring-zinc-400/20",
-          isActive && "bg-[#EEEEEE] text-zinc-950 shadow-sm font-semibold",
+          "flex items-center rounded py-2.5 text-sm font-medium transition-all duration-200 ease-in-out font-primary select-none outline-none",
+          isCollapsed ? "w-12 h-12 justify-center mx-auto px-0" : "w-full gap-3 px-5 text-left",
+          "text-[#474747] hover:text-[#1F1F1F] focus-visible:text-[#1F1F1F]",
+          "hover:bg-[#E0E8F6]",
+          "focus-visible:bg-[#E0E8F6] focus-visible:ring-2 focus-visible:ring-blue-400/20",
+          isActive && "bg-[#D3E3FD] text-[#041E49] shadow-xs font-bold",
           className
         )}
         title={isCollapsed ? label : undefined}
         {...props}
       >
-        {icon && <span className="flex-shrink-0 text-zinc-500 transition-colors group-hover:text-zinc-900">{icon}</span>}
+        {icon && <span className={cn("flex-shrink-0 transition-colors", isActive ? "text-[#041E49]" : "text-zinc-500 group-hover:text-zinc-900")}>{icon}</span>}
         {!isCollapsed && <span className="truncate">{label}</span>}
       </button>
     );

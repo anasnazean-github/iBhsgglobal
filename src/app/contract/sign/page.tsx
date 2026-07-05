@@ -1,5 +1,4 @@
 "use client";
-
 import * as React from "react";
 import { submitMobileSignature } from "@/lib/api";
 import { showToast } from "@/lib/toast";
@@ -148,35 +147,33 @@ export default function MobileSignPage() {
 
   if (submitted) {
     return (
-      <div className="flex min-h-screen w-full flex-col items-center justify-center bg-[#EEEEEE] p-6 font-primary animate-fade-in">
-        <div className="w-full max-w-md bg-[#E5E5E5] border border-zinc-300 rounded-lg p-8 shadow-md text-center flex flex-col items-center gap-5">
-          <div className="h-14 w-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-xs">
-            <CheckCircle className="w-8 h-8" />
-          </div>
-          <h1 className="text-xl font-extrabold text-zinc-900">Signature Submitted!</h1>
-          <p className="text-sm text-zinc-555 leading-relaxed">
-            Your handwritten signature has been successfully captured. Please check your desktop computer to download the signed contract PDF and finalize your login setup.
-          </p>
-          <p className="text-xs text-zinc-400 font-medium">You can safely close this mobile browser tab now.</p>
+      <div className="flex h-[100dvh] w-full flex-col items-center justify-center bg-[#E5E5E5] p-8 text-center font-primary select-none overflow-hidden animate-fade-in gap-5">
+        <div className="h-14 w-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-xs">
+          <CheckCircle className="w-8 h-8" />
         </div>
+        <h1 className="text-xl font-extrabold text-zinc-900">Signature Submitted!</h1>
+        <p className="text-sm text-zinc-650 leading-relaxed max-w-xs">
+          Your handwritten signature has been successfully captured. Please check your desktop computer to download the signed contract PDF and finalize your login setup.
+        </p>
+        <p className="text-xs text-zinc-400 font-medium mt-4">You can safely close this mobile browser tab now.</p>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen w-full flex-col items-center justify-center bg-[#EEEEEE] p-4 font-primary">
-      <div className="w-full max-w-md bg-[#E5E5E5] border border-zinc-300 rounded-lg p-6 shadow-md flex flex-col gap-5">
-        <div className="flex flex-col gap-1 text-center">
-          <div className="mx-auto h-9 w-9 rounded-lg bg-zinc-700 text-white flex items-center justify-center">
-            <Shield className="w-4 h-4" />
-          </div>
-          <h1 className="text-xl font-extrabold tracking-tight text-zinc-950 mt-2">Sign NDA Contract</h1>
-          <p className="text-[10px] text-zinc-500 font-medium truncate">
-            {email ? `Signing for: ${email}` : "Capture mobile credentials"}
-          </p>
+    <div className="flex h-[100dvh] w-full flex-col justify-between bg-[#E5E5E5] p-5 font-primary select-none overflow-hidden">
+      <div className="flex flex-col gap-1 text-center mt-1">
+        <div className="mx-auto h-9 w-9 rounded-lg bg-zinc-700 text-white flex items-center justify-center">
+          <Shield className="w-4 h-4" />
         </div>
+        <h1 className="text-xl font-extrabold tracking-tight text-zinc-950 mt-1">Sign NDA Contract</h1>
+        <p className="text-[10px] text-zinc-500 font-medium truncate">
+          {email ? `Signing for: ${email}` : "Capture mobile credentials"}
+        </p>
+      </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <form onSubmit={handleSubmit} className="flex flex-1 flex-col justify-between mt-4 gap-4">
+        <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
             <label className="text-[9px] uppercase font-bold text-zinc-500 tracking-wider">Full Name</label>
             <input
@@ -185,7 +182,7 @@ export default function MobileSignPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Enter your full name"
-              className="h-10 px-3 bg-[#EEEEEE] border border-zinc-300 rounded-lg text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400/20"
+              className="h-10 px-3 bg-[#EEEEEE] border border-zinc-300 rounded-lg text-base text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400/20 select-text"
             />
           </div>
 
@@ -197,7 +194,7 @@ export default function MobileSignPage() {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="e.g. +65 8123 4567"
-              className="h-10 px-3 bg-[#EEEEEE] border border-zinc-300 rounded-lg text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400/20"
+              className="h-10 px-3 bg-[#EEEEEE] border border-zinc-300 rounded-lg text-base text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400/20 select-text"
             />
           </div>
 
@@ -213,7 +210,7 @@ export default function MobileSignPage() {
                 <span>Clear Canvas</span>
               </button>
             </div>
-            <div className="relative w-full h-44 bg-zinc-50 border border-zinc-300 rounded-lg overflow-hidden cursor-crosshair touch-none">
+            <div className="relative w-full h-36 bg-zinc-50 border border-zinc-300 rounded-lg overflow-hidden cursor-crosshair touch-none">
               <canvas
                 ref={canvasRef}
                 onMouseDown={startDrawing}
@@ -227,16 +224,16 @@ export default function MobileSignPage() {
               />
             </div>
           </div>
+        </div>
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full h-10 bg-zinc-800 hover:bg-zinc-900 disabled:bg-zinc-400 text-white rounded-lg text-sm font-bold shadow-sm transition-colors cursor-pointer focus:outline-none mt-2"
-          >
-            {submitting ? "Submitting Signature..." : "Submit Signature"}
-          </button>
-        </form>
-      </div>
+        <button
+          type="submit"
+          disabled={submitting}
+          className="w-full h-11 bg-zinc-800 hover:bg-zinc-900 disabled:bg-zinc-400 text-white rounded-lg text-sm font-bold shadow-sm transition-colors cursor-pointer focus:outline-none mb-1"
+        >
+          {submitting ? "Submitting Signature..." : "Submit Signature"}
+        </button>
+      </form>
     </div>
   );
 }

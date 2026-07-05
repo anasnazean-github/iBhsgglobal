@@ -21,7 +21,11 @@ import {
   Eye, 
   Boxes,
   Clock,
-  Pencil
+  Pencil,
+  Calendar,
+  ClipboardCheck,
+  BarChart3,
+  Loader2
 } from "lucide-react";
 
 interface SKUItem {
@@ -78,6 +82,11 @@ interface DbOrder {
   Photo_Delivered_Proof?: string;
   Photo_Handover_Proof?: string;
   Photo_Picker_Proof?: string;
+  Photo_Return_Paper?: string;
+  Photo_Return_Paper_Admin?: string;
+  Driver?: string;
+  Invoice_Number?: string;
+  Credit_Note_Number?: string;
 }
 
 interface TrackOrderModuleProps {
@@ -194,22 +203,31 @@ async function loadPdfJs(): Promise<any> {
   });
 }
 
-// Resolve proof image links dynamically from corresponding DbOrder columns
-function getLogImagesForAction(action: string, order: DbOrder): string[] {
-  if (!order) return [];
-  const act = String(action || "").toLowerCase();
+// Resolve proof image links dynamically from corresponding DbOrder columns or direct log photoUrl
+function getLogImagesForAction(action: string, order: DbOrder, logPhotoUrl?: string): string[] {
   let val: any = "";
   
-  if (act.includes("created") || act.includes("imported") || act.includes("sent")) {
-    val = order.Photo_DO_Paper;
-  } else if (act.includes("picked") || act.includes("proof")) {
-    val = order.Photo_Picker_Proof;
-  } else if (act.includes("delivered")) {
-    val = order.Photo_Delivered_Proof;
-  } else if (act.includes("handover")) {
-    val = order.Photo_Handover_Proof;
-  } else if (act.includes("signed")) {
-    val = order.Photo_DO_Paper_Signed;
+  if (logPhotoUrl) {
+    val = logPhotoUrl;
+  } else {
+    if (!order) return [];
+    const act = String(action || "").toLowerCase();
+    
+    if (act.includes("created") || act.includes("imported") || act.includes("sent")) {
+      val = order.Photo_DO_Paper;
+    } else if (act.includes("picked") || act.includes("proof")) {
+      val = order.Photo_Picker_Proof;
+    } else if (act.includes("delivered")) {
+      val = order.Photo_Delivered_Proof;
+    } else if (act.includes("handover")) {
+      val = order.Photo_Handover_Proof;
+    } else if (act.includes("signed")) {
+      val = order.Photo_DO_Paper_Signed;
+    } else if (act.includes("pick return") || act.includes("return paper")) {
+      val = order.Photo_Return_Paper;
+    } else if (act.includes("unpick return") || act.includes("return paper admin")) {
+      val = order.Photo_Return_Paper_Admin;
+    }
   }
   
   if (!val) return [];
@@ -301,50 +319,109 @@ function SlidePanel({ isOpen, onClose, title, children, footer }: SlidePanelProp
   }, [isOpen, onClose]);
 
   return (
-    <div 
-      className={`fixed top-0 right-0 h-screen w-full sm:w-[450px] bg-[#EEEEEE] shadow-2xl border-l border-zinc-300 z-50 transform transition-transform duration-300 ease-in-out flex flex-col ${
-        isOpen ? "translate-x-0" : "translate-x-full"
-      }`}
-    >
-      <div className="flex flex-col h-full font-primary">
-        {/* Panel Header */}
-        <div className="p-4 border-b border-zinc-300 flex items-center justify-between bg-zinc-100 flex-shrink-0">
-          <h4 className="text-sm font-bold text-zinc-800 text-left">
-            {title}
-          </h4>
-          <button
-            onClick={onClose}
-            className="p-1 rounded hover:bg-zinc-200 text-zinc-500 hover:text-zinc-800 cursor-pointer flex-shrink-0"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Panel Body */}
-        <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4 text-xs">
-          {children}
-        </div>
-
-        {/* Panel Footer */}
-        {footer && (
-          <div className="p-4 bg-zinc-100 border-t border-zinc-300 flex justify-end gap-2 flex-shrink-0">
-            {footer}
+    <>
+      {/* Backdrop overlay to close when clicking outside */}
+      <div 
+        className={`fixed inset-0 bg-zinc-950/25 z-40 transition-opacity duration-300 ${
+          isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
+        onClick={onClose}
+      />
+      
+      <div 
+        className={`fixed top-0 right-0 h-screen w-full sm:w-[450px] bg-white shadow-2xl border-l border-slate-200 z-50 transform transition-transform duration-300 ease-in-out flex flex-col ${
+          isOpen ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        <div className="flex flex-col h-full font-primary">
+          {/* Panel Header */}
+          <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50 flex-shrink-0">
+            <h4 className="text-sm font-bold text-zinc-800 text-left">
+              {title}
+            </h4>
+            <button
+              onClick={onClose}
+              className="p-1 rounded hover:bg-slate-200 text-zinc-500 hover:text-zinc-800 cursor-pointer flex-shrink-0"
+            >
+              <X size={18} />
+            </button>
           </div>
-        )}
+
+          {/* Panel Body */}
+          <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4 text-xs bg-white">
+            {children}
+          </div>
+
+          {/* Panel Footer */}
+          {footer && (
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-2 flex-shrink-0">
+              {footer}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
+const getOrderEditsRemark = (oldOrder: DbOrder, newFields: Partial<DbOrder>): string => {
+  const changes: string[] = [];
+
+  if (newFields.Mark !== undefined && newFields.Mark !== oldOrder.Mark) {
+    changes.push(`Mark "${oldOrder.Mark}" -> "${newFields.Mark}"`);
+  }
+  if (newFields.Poscode !== undefined && newFields.Poscode !== oldOrder.Poscode) {
+    changes.push(`Poscode "${oldOrder.Poscode}" -> "${newFields.Poscode}"`);
+  }
+  if (newFields.Deliver_To !== undefined && newFields.Deliver_To !== oldOrder.Deliver_To) {
+    changes.push(`Address changed`);
+  }
+  if (newFields.Deliver_Method !== undefined && newFields.Deliver_Method !== oldOrder.Deliver_Method) {
+    changes.push(`Method "${oldOrder.Deliver_Method}" -> "${newFields.Deliver_Method}"`);
+  }
+  if (newFields.Type !== undefined && newFields.Type !== oldOrder.Type) {
+    changes.push(`Type "${oldOrder.Type}" -> "${newFields.Type}"`);
+  }
+
+  if (newFields.Items !== undefined) {
+    try {
+      const oldItems: SKUItem[] = typeof oldOrder.Items === "string" ? JSON.parse(oldOrder.Items) : oldOrder.Items;
+      const newItems: SKUItem[] = typeof newFields.Items === "string" ? JSON.parse(newFields.Items) : newFields.Items;
+
+      const oldMap = new Map(oldItems.map(i => [i.sku, i.qty]));
+      const newMap = new Map(newItems.map(i => [i.sku, i.qty]));
+
+      oldItems.forEach(i => {
+        if (!newMap.has(i.sku)) {
+          changes.push(`removed ${i.sku}`);
+        } else if (newMap.get(i.sku) !== i.qty) {
+          changes.push(`changed ${i.sku} qty (${i.qty} -> ${newMap.get(i.sku)})`);
+        }
+      });
+
+      newItems.forEach(i => {
+        if (!oldMap.has(i.sku)) {
+          changes.push(`added ${i.sku} (qty ${i.qty})`);
+        }
+      });
+    } catch (e) {
+      console.error("Failed to parse items for change logs:", e);
+    }
+  }
+
+  return changes.length > 0 ? `Edited: ${changes.join(", ")}` : "Order details updated";
+};
+
 export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
   const tabs = [
-    { id: "pending", label: "Pending" },
-    { id: "complete", label: "Complete" },
-    { id: "create", label: "Create Order" },
-    { id: "return", label: "Return Order" }
+    { id: "dashboard", label: "Dashboard" },
+    { id: "delivery", label: "Delivery Order" },
+    { id: "return", label: "Return Order" },
+    { id: "create", label: "Create Order" }
   ];
 
-  const [activeTab, setActiveTab] = React.useState<string>("pending");
+  const [activeTab, setActiveTab] = React.useState<string>("dashboard");
+  const [activeDeliveryTab, setActiveDeliveryTab] = React.useState<"pending" | "complete">("pending");
   const [drafts, setDrafts] = React.useState<TrackOrderDraft[]>([]);
   const [dbOrders, setDbOrders] = React.useState<DbOrder[]>([]);
   const [pdfLoading, setPdfLoading] = React.useState<boolean>(false);
@@ -371,17 +448,21 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
   const [createTimeWindow, setCreateTimeWindow] = React.useState<string>("");
   const [createDeliverMethod, setCreateDeliverMethod] = React.useState<string>("Company Delivery");
   const [tick, setTick] = React.useState<number>(0);
+  const [editingOrder, setEditingOrder] = React.useState<DbOrder | null>(null);
 
   // Return Orders panel and display states
   const [stores, setStores] = React.useState<any[]>([]);
-  const [showCompleteReturns, setShowCompleteReturns] = React.useState<boolean>(false);
+  const [retailers, setRetailers] = React.useState<any[]>([]);
+  const [activeReturnTab, setActiveReturnTab] = React.useState<"pending" | "complete">("pending");
   const [isReturnPanelOpen, setIsReturnPanelOpen] = React.useState<boolean>(false);
   const [editingReturn, setEditingReturn] = React.useState<DbOrder | null>(null);
   const [returnRefNumber, setReturnRefNumber] = React.useState("");
   const [returnLocation, setReturnLocation] = React.useState("");
+  const [returnPoscode, setReturnPoscode] = React.useState("");
   const [returnCollectBeforeDate, setReturnCollectBeforeDate] = React.useState("");
   const [returnMark, setReturnMark] = React.useState("R");
   const [returnItems, setReturnItems] = React.useState<SKUItem[]>([]);
+  const [returnCollectMethod, setReturnCollectMethod] = React.useState<string>("Company Vehicle");
   const [storeSearchQuery, setStoreSearchQuery] = React.useState("");
   const [showStoreDropdown, setShowStoreDropdown] = React.useState(false);
 
@@ -392,6 +473,20 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
   const [selectedOrderMark, setSelectedOrderMark] = React.useState<string>("");
   const [selectedOrderId, setSelectedOrderId] = React.useState<string>("");
   const [selectedOrder, setSelectedOrder] = React.useState<DbOrder | null>(null);
+
+  // Status Overwrite States
+  const [isChangeStatusOpen, setIsChangeStatusOpen] = React.useState<boolean>(false);
+  const [statusOrder, setStatusOrder] = React.useState<DbOrder | null>(null);
+  const [newStatus, setNewStatus] = React.useState<string>("");
+  const [statusRemark, setStatusRemark] = React.useState<string>("");
+  const [statusPhotoFile, setStatusPhotoFile] = React.useState<File | null>(null);
+  const [statusPhotoUploading, setStatusPhotoUploading] = React.useState<boolean>(false);
+
+  // Complete Order Confirmation States
+  const [isCompleteConfirmOpen, setIsCompleteConfirmOpen] = React.useState<boolean>(false);
+  const [pendingCompleteOrder, setPendingCompleteOrder] = React.useState<DbOrder | null>(null);
+  const [invoiceNumberInput, setInvoiceNumberInput] = React.useState<string>("");
+  const [creditNoteInput, setCreditNoteInput] = React.useState<string>("");
 
   // Lightbox modal state for viewing images in full size
   const [activeLightboxImage, setActiveLightboxImage] = React.useState<string | null>(null);
@@ -429,7 +524,7 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
 
   // Load Leaflet Script and Stylesheets from CDN
   React.useEffect(() => {
-    if (activeTab !== "pending") return;
+    if (activeTab !== "dashboard") return;
 
     if (!document.getElementById("leaflet-css")) {
       const link = document.createElement("link");
@@ -460,6 +555,15 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : (data.value || []);
         setStores(list);
+      }
+    } catch (_) {}
+
+    try {
+      const res = await fetch("https://ib.hsgglobalpteltd.workers.dev/api/admin/cache?sheet=retailers_DB");
+      if (res.ok) {
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : (data.value || []);
+        setRetailers(list);
       }
     } catch (_) {}
   };
@@ -631,7 +735,7 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
 
     // Check if Mark is active in pending orders
     const isMarkActive = pendingOrders.some(
-      (o) => String(o.Mark).toUpperCase() === createMark.toUpperCase()
+      (o) => String(o.Mark).toUpperCase() === createMark.toUpperCase() && (!editingOrder || o.ID !== editingOrder.ID)
     );
     if (isMarkActive) {
       showToast(`Mark "${createMark}" is currently active in a pending order.`, "error");
@@ -639,11 +743,11 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
     }
 
     // Validation: check if DO Number is already registered in Drafts, Pending, or Completed lists
-    const inDrafts = drafts.some((d) => d.doNumber === createDoNumber);
-    const inPending = pendingOrders.some((p) => p.DO_Number === createDoNumber);
-    const inCompleted = completedOrders.some((c) => c.DO_Number === createDoNumber);
+    const inDrafts = drafts.some((d) => d.doNumber === createDoNumber && (!editingOrder || d.id !== editingOrder.ID));
+    const inPending = pendingOrders.some((p) => p.DO_Number === createDoNumber && (!editingOrder || p.ID !== editingOrder.ID));
+    const inCompleted = completedOrders.some((c) => c.DO_Number === createDoNumber && (!editingOrder || c.ID !== editingOrder.ID));
 
-    if (inDrafts || inPending || inCompleted) {
+    if ((!editingOrder && inDrafts) || inPending || inCompleted) {
       showToast(`Warning: Order ${createDoNumber} already registered in system. Please check order.`, "error");
       return;
     }
@@ -665,6 +769,76 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
       ? getAppointmentDeadline(createAppointmentDate, createTimeWindow)
       : 0;
 
+    if (editingOrder) {
+      const orderId = editingOrder.ID;
+      let parsedItems: SKUItem[] = createItems.filter(i => i.sku.trim() !== "");
+
+      const payloadData: Partial<DbOrder> = {
+        ID: orderId,
+        DO_Number: createDoNumber,
+        Ref_Number: createRefNumber,
+        Mark: createMark,
+        Type: createType,
+        Deliver_To: createDeliverTo,
+        Deliver_Method: createDeliverMethod,
+        Poscode: createPoscode.trim(),
+        Items: JSON.stringify(parsedItems),
+        Deadline: deadlineVal
+      };
+
+      const remarkText = getOrderEditsRemark(editingOrder, payloadData);
+
+      let currentLogs: LogEntry[] = [];
+      try {
+        currentLogs = typeof editingOrder.Logs === "string" ? JSON.parse(editingOrder.Logs) : editingOrder.Logs;
+      } catch (_) {}
+      if (!Array.isArray(currentLogs)) currentLogs = [];
+
+      const updatedLogs = [
+        ...currentLogs,
+        {
+          action: "Edited by Admin",
+          actionBy: currentUser,
+          remark: remarkText,
+          timestamp: Date.now()
+        }
+      ];
+
+      payloadData.Logs = JSON.stringify(updatedLogs);
+
+      const previousDbOrders = [...dbOrders];
+      setDbOrders(prev => prev.map(o => o.ID === orderId ? { ...o, ...payloadData } as DbOrder : o));
+
+      setIsCreatePanelOpen(false);
+      resetCreateForm();
+      setEditingOrder(null);
+      showToast(`Order ${createDoNumber} updated successfully.`, "success");
+
+      const updatePayload = {
+        sheet: "Track_Orders",
+        action: "update",
+        id: orderId,
+        data: payloadData
+      };
+
+      fetch("/api/admin/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatePayload)
+      })
+        .then(async (res) => {
+          if (!res.ok) throw new Error(`Server returned status ${res.status}`);
+          const result = await res.json() as any;
+          if (!result.success) throw new Error(result.error || "Update failed");
+        })
+        .catch((err) => {
+          console.error("Update failed:", err);
+          setDbOrders(previousDbOrders);
+          showToast("Failed to save changes: " + err.message + ". Reverted.", "error");
+        });
+      return;
+    }
+
     const newDraft: TrackOrderDraft = {
       id: `${createDoNumber}_${createRefNumber || "NA"}`,
       doNumber: createDoNumber,
@@ -684,18 +858,8 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
     saveDraftsToStorage(updated);
     showToast(`Draft for DO ${createDoNumber} created successfully.`, "success");
 
-    // Reset and close
     setIsCreatePanelOpen(false);
-    setCreateDoNumber("");
-    setCreateRefNumber("");
-    setCreateMark("");
-    setCreateType("Normal");
-    setCreateDeliverTo("");
-    setCreatePoscode("");
-    setCreateItems([]);
-    setCreateAppointmentDate("");
-    setCreateTimeWindow("");
-    setCreateDeliverMethod("Company Delivery");
+    resetCreateForm();
   };
 
   // Filter orders for Pending and Complete lists
@@ -711,14 +875,55 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
     );
   }, [dbOrders]);
 
+  const qtyDoneToday = React.useMemo(() => {
+    let totalQty = 0;
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const startOfTodayMs = startOfToday.getTime();
+
+    dbOrders.forEach((o) => {
+      if ((String(o.Completed) === "true" || o.Completed === true) && o.Type !== "Return") {
+        let completedToday = false;
+        try {
+          const logs = typeof o.Logs === "string" ? JSON.parse(o.Logs) : o.Logs;
+          if (Array.isArray(logs)) {
+            const compLog = logs.find((l: any) => l.action?.includes("Completed"));
+            if (compLog && Number(compLog.timestamp) >= startOfTodayMs) {
+              completedToday = true;
+            } else if (!compLog && o.Timestamp && Number(o.Timestamp) >= startOfTodayMs) {
+              completedToday = true;
+            }
+          }
+        } catch (_) {
+          if (o.Timestamp && Number(o.Timestamp) >= startOfTodayMs) {
+            completedToday = true;
+          }
+        }
+
+        if (completedToday) {
+          try {
+            const items = typeof o.Items === "string" ? JSON.parse(o.Items) : o.Items;
+            if (Array.isArray(items)) {
+              totalQty += items.reduce((sum: number, item: any) => sum + (Number(item.qty) || 0), 0);
+            }
+          } catch (_) {}
+        }
+      }
+    });
+    return totalQty;
+  }, [dbOrders]);
+
   // Return Orders filtered lists
   const returnOrders = React.useMemo(() => {
     return dbOrders.filter((o) => {
       if (o.Type !== "Return") return false;
-      if (showCompleteReturns) return true;
-      return o.Status !== "Complete";
+      if (activeReturnTab === "complete") {
+        return o.Status === "Complete";
+      } else {
+        return o.Status !== "Complete";
+      }
     });
-  }, [dbOrders, showCompleteReturns]);
+  }, [dbOrders, activeReturnTab]);
 
   const sortedReturnOrders = React.useMemo(() => {
     return [...returnOrders].sort((a, b) => {
@@ -765,7 +970,7 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
     }
   };
 
-  const handleCompleteReturnOrder = async (order: DbOrder) => {
+  const handleCompleteReturnOrder = async (order: DbOrder, creditNoteNum?: string) => {
     let currentLogs: LogEntry[] = [];
     try {
       currentLogs = typeof order.Logs === "string" ? JSON.parse(order.Logs) : order.Logs;
@@ -776,7 +981,7 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
       {
         action: "Completed by Admin",
         actionBy: currentUser,
-        remark: "Return marked as Complete",
+        remark: creditNoteNum ? `Return marked as Complete (Credit Note: ${creditNoteNum})` : "Return marked as Complete",
         timestamp: Date.now()
       }
     ];
@@ -785,7 +990,7 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
     setDbOrders((prev) =>
       prev.map((o) =>
         o.ID === order.ID
-          ? { ...o, Status: "Complete", Logs: JSON.stringify(updatedLogs) }
+          ? { ...o, Status: "Complete", Credit_Note_Number: creditNoteNum || "", Logs: JSON.stringify(updatedLogs) }
           : o
       )
     );
@@ -798,6 +1003,7 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
       data: {
         ID: order.ID,
         Status: "Complete",
+        Credit_Note_Number: creditNoteNum || "",
         Logs: JSON.stringify(updatedLogs)
       }
     };
@@ -823,9 +1029,11 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
     setEditingReturn(null);
     setReturnRefNumber("");
     setReturnLocation("");
+    setReturnPoscode("");
     setReturnCollectBeforeDate("");
     setReturnMark("");
-    setReturnItems([{ sku: "", qty: 1 }]);
+    setReturnItems([]);
+    setReturnCollectMethod("Company Vehicle");
     setIsReturnPanelOpen(true);
   };
 
@@ -833,6 +1041,7 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
     setEditingReturn(order);
     setReturnRefNumber(order.Ref_Number || order.DO_Number || "");
     setReturnLocation(order.Deliver_To || "");
+    setReturnPoscode(order.Poscode || "");
     
     if (order.Deadline) {
       const d = new Date(Number(order.Deadline));
@@ -851,15 +1060,95 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
     try {
       itemsList = typeof order.Items === "string" ? JSON.parse(order.Items) : order.Items;
     } catch (_) {}
-    setReturnItems(itemsList.length > 0 ? itemsList : [{ sku: "", qty: 1 }]);
+    setReturnItems(itemsList || []);
+    setReturnCollectMethod(order.Deliver_Method || "Company Vehicle");
     setIsReturnPanelOpen(true);
+  };
+
+  const openEditOrderPanel = (order: DbOrder) => {
+    setEditingOrder(order);
+    setCreateDoNumber(order.DO_Number);
+    setCreateRefNumber(order.Ref_Number || "");
+    setCreateMark(order.Mark);
+    
+    const typeStr = order.Type || "Normal";
+    let parsedType: "Normal" | "Urgent" | "Appointment" = "Normal";
+    if (typeStr.startsWith("Appointment")) {
+      parsedType = "Appointment";
+    } else if (typeStr.startsWith("Urgent")) {
+      parsedType = "Urgent";
+    }
+    setCreateType(parsedType);
+    
+    setCreateDeliverTo(order.Deliver_To);
+    setCreatePoscode(order.Poscode || "");
+    setCreateDeliverMethod(order.Deliver_Method || "Company Delivery");
+    
+    let parsedItems: SKUItem[] = [];
+    try {
+      parsedItems = typeof order.Items === "string" ? JSON.parse(order.Items) : order.Items;
+    } catch (_) {}
+    setCreateItems(parsedItems || []);
+    
+    if (parsedType === "Appointment" && order.Deadline) {
+      const dt = new Date(Number(order.Deadline));
+      const yyyy = dt.getFullYear();
+      const mm = String(dt.getMonth() + 1).padStart(2, '0');
+      const dd = String(dt.getDate()).padStart(2, '0');
+      setCreateAppointmentDate(`${yyyy}-${mm}-${dd}`);
+      
+      const hh = String(dt.getHours()).padStart(2, '0');
+      const min = String(dt.getMinutes()).padStart(2, '0');
+      setCreateTimeWindow(`${hh}:${min}`);
+    } else {
+      setCreateAppointmentDate("");
+      setCreateTimeWindow("");
+    }
+    
+    setIsCreatePanelOpen(true);
+  };
+
+  const resetCreateForm = () => {
+    setCreateDoNumber("");
+    setCreateRefNumber("");
+    setCreateMark("");
+    setCreateType("Normal");
+    setCreateDeliverTo("");
+    setCreatePoscode("");
+    setCreateItems([]);
+    setCreateAppointmentDate("");
+    setCreateTimeWindow("");
+    setCreateDeliverMethod("Company Delivery");
   };
 
   const handleReturnSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!returnRefNumber.trim() || !returnLocation.trim() || !returnCollectBeforeDate || !returnMark.trim()) {
+    if (!returnRefNumber.trim() || !returnLocation.trim() || !returnPoscode.trim() || !returnCollectBeforeDate || !returnMark.trim()) {
       showToast("Please fill in all mandatory fields.", "error");
       return;
+    }
+
+    if (!validatePoscode(returnPoscode)) {
+      showToast("Please enter a valid 6-digit Singapore Postal Code.", "error");
+      return;
+    }
+
+    let lat: number | string = "";
+    let lng: number | string = "";
+    try {
+      const coords = await fetchPostcodeCoordinates(returnPoscode, oneMapUrl, oneMapToken);
+      if (coords) {
+        lat = coords.lat;
+        lng = coords.lng;
+      } else {
+        const fallback = getSingaporeLatLng(returnPoscode);
+        lat = fallback.lat;
+        lng = fallback.lng;
+      }
+    } catch (_) {
+      const fallback = getSingaporeLatLng(returnPoscode);
+      lat = fallback.lat;
+      lng = fallback.lng;
     }
 
     const finalMark = "R" + returnMark.trim().toUpperCase();
@@ -892,29 +1181,37 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
           }
         ];
         
-    if (isEdit) {
-      initialLogs.push({
-        action: "Edited by Admin",
-        actionBy: currentUser,
-        remark: "Return details updated",
-        timestamp: Date.now()
-      });
-    }
-
-    const payloadData: Partial<DbOrder> = {
+    const payloadDataTemp: Partial<DbOrder> = {
       ID: orderId,
       DO_Number: returnRefNumber,
       Ref_Number: returnRefNumber,
       Mark: finalMark,
       Type: "Return",
       Deliver_To: returnLocation,
-      Poscode: returnLocation.split(" - ")[0] || "",
+      Deliver_Method: returnCollectMethod,
+      Poscode: returnPoscode.trim(),
       Items: JSON.stringify(returnItems.filter(i => i.sku.trim() !== "")),
       Status: isEdit ? editingReturn.Status : "Pending",
-      Logs: JSON.stringify(initialLogs),
       Timestamp: isEdit ? editingReturn.Timestamp : Date.now(),
       Deadline: epochDate,
-      Completed: isEdit ? editingReturn.Completed : "false"
+      Completed: isEdit ? editingReturn.Completed : "false",
+      Latitude: lat,
+      Longitude: lng
+    };
+        
+    if (isEdit) {
+      const remarkText = getOrderEditsRemark(editingReturn, payloadDataTemp);
+      initialLogs.push({
+        action: "Edited by Admin",
+        actionBy: currentUser,
+        remark: remarkText,
+        timestamp: Date.now()
+      });
+    }
+
+    const payloadData = {
+      ...payloadDataTemp,
+      Logs: JSON.stringify(initialLogs)
     };
 
     const previousDbOrders = [...dbOrders];
@@ -1171,24 +1468,24 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
         }
         
         // Colors & labels corresponding to color groups
-        let color = "#9CA3AF"; // Gray
+        let color = "#9CA3AF"; // Default Gray
         let textColor = "#18181B"; // Dark text
         let displayStatus = "Preparing Goods";
 
         if (o.Status === "Ready to Pick" || o.Status === "Picking") {
-          color = "#9CA3AF"; // Gray
-          textColor = "#18181B";
-          displayStatus = "Preparing Goods";
-        } else if (o.Status === "Ready to Deliver" || o.Status === "Load") {
-          color = "#18181B"; // Black
-          textColor = "#FFFFFF"; // Light text
-          displayStatus = "Goods Ready";
-        } else if (o.Status === "Out for Delivery") {
-          color = "#EF4444"; // Red
+          color = "#D47A8E"; // Dusty Rose
           textColor = "#FFFFFF";
-          displayStatus = "Driver Deliver or Collect Goods";
+          displayStatus = "Preparing Goods";
+        } else if (o.Status === "Ready to Deliver") {
+          color = "#E28B54"; // Soft Orange
+          textColor = "#FFFFFF";
+          displayStatus = "Goods Ready";
+        } else if (o.Status === "Load" || o.Status === "Out for Delivery") {
+          color = "#007A87"; // Teal Blue
+          textColor = "#FFFFFF";
+          displayStatus = o.Status === "Load" ? "Goods Ready" : "Driver Deliver or Collect Goods";
         } else if (o.Status === "Delivered") {
-          color = "#10B981"; // Green
+          color = "#14532D"; // Deep Forest Green
           textColor = "#FFFFFF";
           displayStatus = "Complete Job";
         }
@@ -1203,7 +1500,9 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
           textColor,
           lat,
           lng,
-          isReturn: false
+          isReturn: false,
+          typeDisplay: o.Type || "Normal",
+          deliverMethod: o.Deliver_Method || "Company Delivery"
         };
       });
 
@@ -1231,20 +1530,20 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
         }
 
         // Return status colors & labels
-        let color = "#EF4444"; // Red for Pending return (Return to Collect)
+        let color = "#007A87"; // Default Teal Blue (Pending)
         let textColor = "#FFFFFF";
         let displayStatus = "Driver Deliver or Collect Goods";
 
         if (o.Status === "Collected") {
-          color = "#10B981"; // Green for Collected return (Complete Job)
+          color = "#14532D"; // Deep Forest Green
           textColor = "#FFFFFF";
           displayStatus = "Complete Job";
         } else if (o.Status === "Pending") {
-          color = "#EF4444"; // Red for Pending return (Driver Deliver or Collect Goods)
+          color = "#007A87"; // Teal Blue
           textColor = "#FFFFFF";
           displayStatus = "Driver Deliver or Collect Goods";
         } else if (o.Status === "Complete") {
-          color = "#10B981"; // Green
+          color = "#14532D"; // Deep Forest Green
           textColor = "#FFFFFF";
           displayStatus = "Complete Job";
         }
@@ -1259,16 +1558,18 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
           textColor,
           lat,
           lng,
-          isReturn: true
+          isReturn: true,
+          typeDisplay: "Normal",
+          deliverMethod: o.Deliver_Method || "Company Vehicle"
         };
       });
 
     return [...deliveryPins, ...returnPins];
   }, [pendingOrders, dbOrders, stores]);
 
-  // Update Leaflet Map markers and focus bounds in real-time
+  // 1. Initialize and cleanup Leaflet Map instance
   React.useEffect(() => {
-    if (!leafletLoaded || !isMapOpen) return;
+    if (!leafletLoaded || activeTab !== "dashboard") return;
 
     const L = (window as any).L;
     if (!L) return;
@@ -1284,14 +1585,35 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
       }).addTo(mapRef.current);
 
       markersGroupRef.current = L.featureGroup().addTo(mapRef.current);
+      
+      // Trigger invalidateSize to redraw tiles correctly on first render
+      setTimeout(() => {
+        if (mapRef.current) {
+          mapRef.current.invalidateSize();
+        }
+      }, 300);
     }
 
-    const map = mapRef.current;
-    const markersGroup = markersGroupRef.current;
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        markersGroupRef.current = null;
+      }
+    };
+  }, [leafletLoaded, activeTab]);
 
+  // 2. Render and update markers dynamically without re-initializing the map (prevents flickering)
+  React.useEffect(() => {
+    if (!leafletLoaded || activeTab !== "dashboard" || !mapRef.current || !markersGroupRef.current) return;
+
+    const L = (window as any).L;
+    if (!L) return;
+
+    const markersGroup = markersGroupRef.current;
     markersGroup.clearLayers();
 
-    // 1. Add Warehouse Pin (postcode: 409461 -> 1.3197, 103.8962) with Home Icon in gray
+    // Add Warehouse Pin (postcode: 409461 -> 1.3197, 103.8962) with Home Icon in gray
     const homeIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`;
     const warehouseIcon = L.divIcon({
       html: `<div style="background-color: #9CA3AF; border: 1px solid white; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; color: white; box-shadow: 0 1px 3px rgba(0,0,0,0.25);">${homeIconSvg}</div>`,
@@ -1303,7 +1625,7 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
     L.marker([1.3197, 103.8962], { icon: warehouseIcon })
       .addTo(markersGroup);
 
-    // 2. Add Active Order Pins with circular jittering for duplicate locations
+    // Add Active Order Pins with circular jittering for duplicate locations
     const coordinatesCount: Record<string, number> = {};
 
     activePins.forEach((pin) => {
@@ -1335,33 +1657,17 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
 
       L.marker([finalLat, finalLng], { icon: customIcon })
         .bindPopup(`
-          <div style="font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #18181B; font-weight: 500; min-width: 140px;">
-            <b style="font-size: 12px; display: block; border-b: 1px solid #E5E5E5; padding-bottom: 3px; margin-bottom: 4px;">Mark Lot: ${pin.mark}</b>
-            <b>Status:</b> ${pin.status}<br/>
-            <b>Deliver To:</b> ${pin.deliverTo}<br/>
-            <b>Postal Code:</b> ${pin.poscode}
+          <div style="font-family: sans-serif; font-size: 11px; line-height: 1.4; color: #18181B; font-weight: 500; min-width: 160px; padding: 2px;">
+            <div style="font-size: 12px; font-weight: bold; border-bottom: 1px solid #E5E5E5; padding-bottom: 3px; margin-bottom: 4px;">
+              ${pin.mark} - ${pin.typeDisplay}
+            </div>
+            <div style="margin-bottom: 3px; font-weight: 600;">${pin.deliverTo}</div>
+            <div style="color: #4B5563;">${pin.poscode} | ${pin.deliverMethod}</div>
           </div>
         `)
         .addTo(markersGroup);
     });
-
-    // 3. Zoom out to show full Singapore by default
-    map.setView([1.3521, 103.8198], 11);
-
-    // Trigger invalidateSize to redraw tiles correctly
-    setTimeout(() => {
-      map.invalidateSize();
-    }, 300);
-
-    // Cleanup: remove map instance when effect re-runs or unmounts (fixes blank map when switching tabs)
-    return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-        markersGroupRef.current = null;
-      }
-    };
-  }, [leafletLoaded, isMapOpen, activePins, activeTab]);
+  }, [leafletLoaded, activeTab, activePins]);
 
   // Save drafts helper
   const saveDraftsToStorage = (updatedDrafts: TrackOrderDraft[]) => {
@@ -1749,14 +2055,8 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
 
   // Revoke Action: Deletes from Sheets and moves back to drafts
   const handleRevokeOrder = (order: DbOrder) => {
-    const statusLower = String(order.Status || "").toLowerCase().trim();
-    const activeStatuses = ["picking", "ready to deliver", "load", "out for delivery", "delivered"];
-    if (activeStatuses.includes(statusLower)) {
-      setPendingRevokeOrder(order);
-      setIsConfirmRevokeOpen(true);
-    } else {
-      executeRevokeOrder(order);
-    }
+    setPendingRevokeOrder(order);
+    setIsConfirmRevokeOpen(true);
   };
 
   const executeRevokeOrder = async (order: DbOrder) => {
@@ -1813,7 +2113,7 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
   };
 
   // Complete Action: marks Completed = true
-  const handleCompleteOrder = async (order: DbOrder) => {
+  const handleCompleteOrder = async (order: DbOrder, invoiceNum?: string) => {
     // --- INSTANT UPDATE (OPTIMISTIC UI) ---
     let currentLogs: LogEntry[] = [];
     try {
@@ -1825,7 +2125,7 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
       {
         action: "Completed by Admin",
         actionBy: currentUser,
-        remark: "Archived & Verified",
+        remark: invoiceNum ? `Archived & Verified (Invoice: ${invoiceNum})` : "Archived & Verified",
         timestamp: Date.now()
       }
     ];
@@ -1836,7 +2136,7 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
     setDbOrders((prev) =>
       prev.map((o) =>
         o.ID === order.ID
-          ? { ...o, Completed: "true", Logs: JSON.stringify(updatedLogs) }
+          ? { ...o, Completed: "true", Invoice_Number: invoiceNum || "", Logs: JSON.stringify(updatedLogs) }
           : o
       )
     );
@@ -1850,6 +2150,7 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
       data: {
         ID: order.ID,
         Completed: "true",
+        Invoice_Number: invoiceNum || "",
         Logs: JSON.stringify(updatedLogs)
       }
     };
@@ -1871,6 +2172,136 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
         setDbOrders(previousDbOrders);
         showToast("Archive failed: " + err.message + ". Reverted changes.", "error");
       });
+  };
+
+  const handleTriggerChangeStatus = (order: DbOrder) => {
+    setStatusOrder(order);
+    setNewStatus(order.Status || "");
+    setStatusRemark("");
+    setStatusPhotoFile(null);
+    setIsChangeStatusOpen(true);
+  };
+
+  const handleSaveStatusOverwrite = async () => {
+    if (!statusOrder) return;
+    if (!newStatus) {
+      showToast("Please select a status", "error");
+      return;
+    }
+
+    setStatusPhotoUploading(true);
+    let uploadedPhotoUrl = "";
+
+    try {
+      if (statusPhotoFile) {
+        showToast("Uploading status image...", "info");
+        const fileName = `Track_Orders/Status_Overwrite/${statusOrder.DO_Number}_${Date.now()}.jpg`;
+        const uploadRes = await fetch(`https://ib.hsgglobalpteltd.workers.dev/api/upload?filename=${encodeURIComponent(fileName)}`, {
+          method: "POST",
+          headers: { "Content-Type": "image/jpeg" },
+          body: statusPhotoFile
+        });
+        if (!uploadRes.ok) throw new Error("Image upload failed");
+        const uploadData = await uploadRes.json() as any;
+        if (uploadData.success) {
+          uploadedPhotoUrl = uploadData.url;
+        }
+      }
+
+      let currentLogs: LogEntry[] = [];
+      try {
+        currentLogs = typeof statusOrder.Logs === "string" ? JSON.parse(statusOrder.Logs) : statusOrder.Logs;
+      } catch (_) {}
+      if (!Array.isArray(currentLogs)) currentLogs = [];
+
+      const updatedLogs = [
+        ...currentLogs,
+        {
+          action: `Status Overwritten: ${newStatus}`,
+          actionBy: currentUser,
+          remark: statusRemark || "Status changed by Admin",
+          photoUrl: uploadedPhotoUrl || undefined,
+          timestamp: Date.now()
+        }
+      ];
+
+      const payloadData: Partial<DbOrder> = {
+        ID: statusOrder.ID,
+        Status: newStatus,
+        Logs: JSON.stringify(updatedLogs)
+      };
+
+      if (newStatus === "Delivered" || newStatus === "Return Collected") {
+        payloadData.Delivered_At = Date.now();
+      }
+
+      const previousDbOrders = [...dbOrders];
+      setDbOrders(prev => prev.map(o => o.ID === statusOrder.ID ? { ...o, ...payloadData } as DbOrder : o));
+
+      setIsChangeStatusOpen(false);
+      setStatusOrder(null);
+      showToast(`Status updated to ${newStatus}`, "success");
+
+      const payload = {
+        sheet: "Track_Orders",
+        action: "update",
+        id: statusOrder.ID,
+        data: payloadData
+      };
+
+      const res = await fetch("https://ib.hsgglobalpteltd.workers.dev/api/admin/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) throw new Error(`Server returned status ${res.status}`);
+      const result = await res.json() as any;
+      if (!result.success) throw new Error(result.error || "Update failed");
+
+      fetchDatabaseOrders(true);
+    } catch (err: any) {
+      console.error("Status overwrite failed:", err);
+      showToast("Failed to update status: " + err.message, "error");
+    } finally {
+      setStatusPhotoUploading(false);
+    }
+  };
+
+  const handleTriggerCompleteOrder = (order: DbOrder) => {
+    setPendingCompleteOrder(order);
+    setInvoiceNumberInput("");
+    setIsCompleteConfirmOpen(true);
+  };
+
+  const handleTriggerCompleteReturnOrder = (order: DbOrder) => {
+    setPendingCompleteOrder(order);
+    setCreditNoteInput("");
+    setIsCompleteConfirmOpen(true);
+  };
+
+  const handleSkipComplete = () => {
+    if (!pendingCompleteOrder) return;
+    setIsCompleteConfirmOpen(false);
+    
+    if (pendingCompleteOrder.Type === "Return") {
+      handleCompleteReturnOrder(pendingCompleteOrder, "");
+    } else {
+      handleCompleteOrder(pendingCompleteOrder, "");
+    }
+    setPendingCompleteOrder(null);
+  };
+
+  const handleContinueComplete = () => {
+    if (!pendingCompleteOrder) return;
+    setIsCompleteConfirmOpen(false);
+    
+    if (pendingCompleteOrder.Type === "Return") {
+      handleCompleteReturnOrder(pendingCompleteOrder, creditNoteInput.trim());
+    } else {
+      handleCompleteOrder(pendingCompleteOrder, invoiceNumberInput.trim());
+    }
+    setPendingCompleteOrder(null);
   };
 
   // Items Side Panel Drawer Control
@@ -1957,7 +2388,7 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
     <div className="flex flex-col gap-6 relative min-h-[600px]">
       
       {/* Top Banner and Tabs */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-300/40 pb-px">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-px">
         <div className="flex items-center gap-1">
           {tabs.map((tab) => (
             <button
@@ -1966,7 +2397,7 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
               onClick={() => setActiveTab(tab.id)}
               className={`px-6 py-2.5 font-primary text-sm font-bold border-b-2 transition-all duration-200 cursor-pointer ${
                 activeTab === tab.id
-                  ? "border-zinc-950 text-zinc-950"
+                  ? "border-[#0B57D0] text-[#0B57D0]"
                   : "border-transparent text-zinc-400 hover:text-zinc-700"
               }`}
             >
@@ -1974,99 +2405,615 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
             </button>
           ))}
         </div>
+      </div>
 
-        {/* Action controls (Upload Button for Create Order & Track on Map for Pending) */}
-        <div className="flex items-center gap-3">
-          {activeTab === "create" && (
+      {/* TAB CONTENT: DASHBOARD */}
+      {activeTab === "dashboard" && (
+        <div className="flex flex-col gap-6 animate-tableFadeInOnly">
+          {/* Dashboard Metrics Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Card 1: Pending Delivery */}
+            <div className="bg-white border border-slate-200 rounded p-5 flex items-center justify-between shadow-xs">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Pending Delivery</span>
+                <span className="text-3xl font-black text-zinc-950 mt-1">{pendingOrders.length}</span>
+              </div>
+              <div className="h-10 w-10 bg-[#E8F0FE] rounded flex items-center justify-center text-[#0B57D0]">
+                <Calendar size={18} className="stroke-[2.5]" />
+              </div>
+            </div>
+
+            {/* Card 2: Pending Return Delivery */}
+            <div className="bg-white border border-slate-200 rounded p-5 flex items-center justify-between shadow-xs">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Pending Return</span>
+                <span className="text-3xl font-black text-zinc-950 mt-1">
+                  {dbOrders.filter((o) => o.Type === "Return" && o.Status !== "Complete").length}
+                </span>
+              </div>
+              <div className="h-10 w-10 bg-[#FCE8E6] rounded flex items-center justify-center text-[#C5221F]">
+                <ClipboardCheck size={18} className="stroke-[2.5]" />
+              </div>
+            </div>
+
+            {/* Card 3: Qty Done Today */}
+            <div className="bg-white border border-slate-200 rounded p-5 flex items-center justify-between shadow-xs">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Qty Done Today</span>
+                <span className="text-3xl font-black text-zinc-950 mt-1">{qtyDoneToday}</span>
+              </div>
+              <div className="h-10 w-10 bg-[#E6F4EA] rounded flex items-center justify-center text-[#137333]">
+                <BarChart3 size={18} className="stroke-[2.5]" />
+              </div>
+            </div>
+          </div>
+
+          {/* Full Width & Height Map Container */}
+          <div className="w-full h-[520px] rounded border border-slate-200 overflow-hidden relative shadow-sm bg-white">
+            <div id="leaflet-map" className="w-full h-full z-10" />
+            {!leafletLoaded && (
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-50 z-20">
+                <div className="flex flex-col items-center gap-2">
+                  <Loader2 className="w-6 h-6 animate-spin text-[#0B57D0]" />
+                  <span className="text-xs font-semibold text-zinc-500">Loading Map View...</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB CONTENT: DELIVERY ORDER */}
+      {activeTab === "delivery" && (
+        <div className="flex flex-col gap-4 animate-tableFadeInOnly">
+          {/* Sub-tabs switch header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1 border-b border-slate-200 pb-2">
             <div className="flex items-center gap-2">
-              <input
-                type="file"
-                ref={fileInputRef}
-                accept=".pdf"
-                className="hidden"
-                onChange={handleFileUpload}
-              />
-              <CustomButton 
-                variant="default"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={pdfLoading}
-                className="relative overflow-hidden bg-zinc-100 hover:bg-zinc-200 border-zinc-300 text-zinc-700 font-bold"
+              <button
+                type="button"
+                onClick={() => setActiveDeliveryTab("pending")}
+                className={`px-4 py-2 font-primary text-xs font-bold border-b-2 transition-all duration-200 cursor-pointer ${
+                  activeDeliveryTab === "pending"
+                    ? "border-[#0B57D0] text-[#0B57D0]"
+                    : "border-transparent text-zinc-400 hover:text-zinc-700"
+                }`}
               >
-                <Upload size={14} />
-                Import Order
-                {pdfLoading && (
-                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600 animate-[pulse_1s_infinite]" />
-                )}
-              </CustomButton>
-              <CustomButton 
-                variant="default"
-                onClick={() => {
-                  setCreateDoNumber(`DO-${Date.now()}`);
-                  setCreateRefNumber("");
-                  setCreateMark(getNextAvailableMark(drafts, pendingOrders));
-                  setCreateType("Normal");
-                  setCreateDeliverTo("");
-                  setCreatePoscode("");
-                  setCreateItems([]);
-                  setIsCreatePanelOpen(true);
-                }}
+                Pending
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveDeliveryTab("complete")}
+                className={`px-4 py-2 font-primary text-xs font-bold border-b-2 transition-all duration-200 cursor-pointer ${
+                  activeDeliveryTab === "complete"
+                    ? "border-[#0B57D0] text-[#0B57D0]"
+                    : "border-transparent text-zinc-400 hover:text-zinc-700"
+                }`}
               >
-                <Plus size={14} />
-                Create Order
-              </CustomButton>
+                Complete
+              </button>
+            </div>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-zinc-600 self-end sm:self-auto">
+              {activeDeliveryTab === "pending" ? sortedPendingOrders.length : completedOrders.length} Orders
+            </span>
+          </div>
+
+          {activeDeliveryTab === "pending" ? (
+            <div className="h-[500px] w-full relative">
+              {sortedPendingOrders.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full bg-[#F0F4F9]/40 border border-dashed border-slate-200 rounded select-none">
+                  <Boxes size={40} className="text-zinc-400 mb-3" />
+                  <span className="font-primary text-sm text-zinc-500 font-medium">
+                    No pending deliveries. Create and send orders from the Create Order tab.
+                  </span>
+                </div>
+              ) : (
+                <div className="h-full overflow-auto border border-slate-200 rounded bg-white">
+                  <table className="w-full text-left font-primary text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 text-zinc-700 font-bold border-b border-slate-200 h-12">
+                        <th className="sticky top-0 bg-slate-50 p-3 w-36 align-middle z-10"></th>
+                        <th className="sticky top-0 bg-slate-50 p-3 w-36 align-middle z-10">Status</th>
+                        <th className="sticky top-0 bg-slate-50 p-3 w-16 text-center align-middle z-10">Mark</th>
+                        <th className="sticky top-0 bg-slate-50 p-3 w-56 align-middle z-10">DO & Ref Number</th>
+                        <th className="sticky top-0 bg-slate-50 p-3 w-36 align-middle z-10">Type</th>
+                        <th className="sticky top-0 bg-slate-50 p-3 w-36 align-middle z-10">Deliver To</th>
+                        <th className="sticky top-0 bg-slate-50 p-3 w-28 text-center align-middle z-10">Poscode</th>
+                        <th className="sticky top-0 bg-slate-50 p-3 w-36 align-middle z-10">Method</th>
+                        <th className="sticky top-0 bg-slate-50 p-3 w-20 text-center align-middle z-10">Items</th>
+                        <th className="sticky top-0 bg-slate-50 p-3 w-16 text-center align-middle z-10">Logs</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-200">
+                      {sortedPendingOrders.map((order, idx) => {
+                        let itemsCount = 0;
+                        let parsedItems: SKUItem[] = [];
+                        try {
+                          parsedItems = typeof order.Items === "string" ? JSON.parse(order.Items) : order.Items;
+                          itemsCount = parsedItems.reduce((acc: number, curr: SKUItem) => acc + curr.qty, 0);
+                        } catch (_) {}
+
+                        let statusBadge = "bg-zinc-100 text-zinc-700 border-zinc-300";
+                        if (order.Status === "Ready to Pick") {
+                          statusBadge = "bg-blue-50 text-blue-700 border-blue-200";
+                        } else if (order.Status === "Picking") {
+                          statusBadge = "bg-amber-50 text-amber-700 border-amber-200";
+                        } else if (order.Status === "Ready to Deliver") {
+                          statusBadge = "bg-indigo-50 text-indigo-700 border-indigo-200";
+                        } else if (order.Status === "Load") {
+                          statusBadge = "bg-purple-50 text-purple-700 border-purple-200";
+                        } else if (order.Status === "Out for Delivery") {
+                          statusBadge = "bg-pink-50 text-pink-700 border-pink-200";
+                        } else if (order.Status === "Delivered") {
+                          statusBadge = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                        }
+
+                        return (
+                          <tr 
+                            key={`${order.ID}-${idx}`} 
+                            className={`transition-all h-14 ${
+                              idx % 2 === 0 ? "bg-[#FFFFFF]" : "bg-[#F8F9FA]"
+                            } hover:bg-slate-50`}
+                          >
+                            <td className="p-3 w-36 align-middle border-b border-zinc-200">
+                              <div className="flex items-center gap-1.5">
+                                <CustomButton
+                                  variant="secondary"
+                                  onClick={() => handleRevokeOrder(order)}
+                                  title="Revoke and send back to drafts"
+                                  className="w-8 h-8 !px-0 flex items-center justify-center aspect-square"
+                                >
+                                  <Undo size={12} className="text-zinc-600" />
+                                </CustomButton>
+                                <CustomButton
+                                  variant="secondary"
+                                  onClick={() => openEditOrderPanel(order)}
+                                  title="Edit Order"
+                                  className="w-8 h-8 !px-0 flex items-center justify-center aspect-square"
+                                >
+                                  <Pencil size={12} className="text-zinc-600" />
+                                </CustomButton>
+                                <CustomButton
+                                  variant="secondary"
+                                  onClick={() => handleTriggerChangeStatus(order)}
+                                  title="Change Status (Overwrite)"
+                                  className="w-8 h-8 !px-0 flex items-center justify-center aspect-square"
+                                >
+                                  <History size={12} className="text-zinc-600" />
+                                </CustomButton>
+                                <CustomButton
+                                  variant="default"
+                                  onClick={() => handleTriggerCompleteOrder(order)}
+                                  disabled={order.Status !== "Delivered"}
+                                  title={order.Status !== "Delivered" ? "Cannot complete until status is Delivered" : "Verify and archive"}
+                                  className="w-8 h-8 !px-0 flex items-center justify-center aspect-square"
+                                >
+                                  <CheckCircle size={12} className="text-emerald-600" />
+                                </CustomButton>
+                              </div>
+                            </td>
+                            <td className="p-3 w-36 align-middle border-b border-zinc-200">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded border text-[10px] font-bold ${statusBadge}`}>
+                                {order.Status || "Ready to Pick"}
+                              </span>
+                            </td>
+                            <td className="p-3 w-16 text-center font-semibold text-zinc-800 align-middle border-b border-zinc-200">
+                              {order.Mark}
+                            </td>
+                            <td className="p-3 w-56 font-semibold text-zinc-800 align-middle border-b border-zinc-200">
+                              {order.DO_Number}
+                              {order.Ref_Number ? `_${order.Ref_Number}` : ""}
+                            </td>
+                            <td className="p-3 w-36 align-middle border-b border-zinc-200">
+                              {renderTypeCell(order)}
+                            </td>
+                            <td className="p-3 w-36 text-zinc-500 align-middle border-b border-zinc-200" title={order.Deliver_To}>
+                              {truncateCharacters(order.Deliver_To)}
+                            </td>
+                            <td className="p-3 w-28 text-center text-zinc-500 align-middle border-b border-zinc-200">
+                              {renderPoscodeCell(order.Poscode)}
+                            </td>
+                            <td className="p-3 w-36 align-middle border-b border-zinc-200 text-zinc-500">
+                              {order.Deliver_Method || "Company Delivery"}
+                            </td>
+                            <td className="p-3 w-20 text-center align-middle border-b border-zinc-200">
+                              <button
+                                type="button"
+                                onClick={() => openItemsPanel("view", order.ID, parsedItems)}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white border border-slate-200 hover:bg-slate-50 transition-all font-semibold text-zinc-700 cursor-pointer"
+                              >
+                                <Boxes size={12} className="text-zinc-500" />
+                                <span>{itemsCount}</span>
+                              </button>
+                            </td>
+                            <td className="p-3 w-16 text-center align-middle border-b border-zinc-200">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenLogs(order)}
+                                className="p-1 rounded hover:bg-zinc-200 text-zinc-600 hover:text-zinc-950 transition-all cursor-pointer"
+                              >
+                                <History size={16} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="h-[500px] w-full relative">
+              {completedOrders.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full bg-[#F0F4F9]/40 border border-dashed border-slate-200 rounded select-none">
+                  <CheckCircle size={40} className="text-zinc-400 mb-3" />
+                  <span className="font-primary text-sm text-zinc-500 font-medium">
+                    No completed orders. Archive deliveries from the Pending tab.
+                  </span>
+                </div>
+              ) : (
+                <div className="h-full overflow-auto border border-slate-200 rounded bg-white">
+                  <table className="w-full text-left font-primary text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 text-zinc-700 font-bold border-b border-slate-200 h-12">
+                        <th className="sticky top-0 bg-slate-50 p-3 w-40 align-middle z-10">Delivered (date time)</th>
+                        <th className="sticky top-0 bg-slate-50 p-3 w-36 align-middle z-10">Status</th>
+                        <th className="sticky top-0 bg-slate-50 p-3 w-20 text-center align-middle z-10">Mark</th>
+                        <th className="sticky top-0 bg-slate-50 p-3 w-56 align-middle z-10">DO & Ref Number</th>
+                        <th className="sticky top-0 bg-slate-50 p-3 w-36 align-middle z-10">Deliver To</th>
+                        <th className="sticky top-0 bg-slate-50 p-3 w-28 text-center align-middle z-10">Poscode</th>
+                        <th className="sticky top-0 bg-slate-50 p-3 w-36 align-middle z-10">Method</th>
+                        <th className="sticky top-0 bg-slate-50 p-3 w-20 text-center align-middle z-10">Items</th>
+                        <th className="sticky top-0 bg-slate-50 p-3 w-16 text-center align-middle z-10">Logs</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-200">
+                      {completedOrders.map((order, idx) => {
+                        let itemsCount = 0;
+                        let parsedItems: SKUItem[] = [];
+                        try {
+                          parsedItems = typeof order.Items === "string" ? JSON.parse(order.Items) : order.Items;
+                          itemsCount = parsedItems.reduce((acc: number, curr: SKUItem) => acc + curr.qty, 0);
+                        } catch (_) {}
+
+                        let deliveredTs = order.Delivered_At;
+                        if (!deliveredTs) {
+                          let logsArr: LogEntry[] = [];
+                          try {
+                            logsArr = typeof order.Logs === "string" ? JSON.parse(order.Logs) : order.Logs;
+                            const match = logsArr.find((l) => l.action.toLowerCase() === "delivered" || l.action.includes("Delivered"));
+                            if (match) deliveredTs = match.timestamp;
+                          } catch (_) {}
+                        }
+                        if (!deliveredTs) {
+                          deliveredTs = order.Timestamp; 
+                        }
+
+                        return (
+                          <tr 
+                            key={order.ID} 
+                            className={`transition-all h-14 ${
+                              idx % 2 === 0 ? "bg-[#FFFFFF]" : "bg-[#F8F9FA]"
+                            } hover:bg-slate-50`}
+                          >
+                            <td className="p-3 w-40 font-semibold text-zinc-700 align-middle border-b border-zinc-200">
+                              {formatTimestamp(deliveredTs)}
+                            </td>
+                            <td className="p-3 w-36 align-middle border-b border-zinc-200">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded border text-[10px] font-bold bg-emerald-50 text-emerald-700 border-emerald-200">
+                                Delivered
+                              </span>
+                            </td>
+                            <td className="p-3 w-20 text-center font-semibold text-zinc-800 align-middle border-b border-zinc-200">
+                              {order.Mark}
+                            </td>
+                            <td className="p-3 w-56 font-semibold text-zinc-950 align-middle border-b border-zinc-200">
+                              {order.DO_Number}
+                              {order.Ref_Number ? `_${order.Ref_Number}` : ""}
+                            </td>
+                            <td className="p-3 w-36 text-zinc-500 align-middle border-b border-zinc-200" title={order.Deliver_To}>
+                              {truncateCharacters(order.Deliver_To)}
+                            </td>
+                            <td className="p-3 w-28 text-center text-zinc-500 align-middle border-b border-zinc-200">
+                              {renderPoscodeCell(order.Poscode)}
+                            </td>
+                            <td className="p-3 w-36 align-middle border-b border-zinc-200 text-zinc-500">
+                              {order.Deliver_Method || "Company Delivery"}
+                            </td>
+                            <td className="p-3 w-20 text-center align-middle border-b border-zinc-200">
+                              <button
+                                type="button"
+                                onClick={() => openItemsPanel("view", order.ID, parsedItems)}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white border border-slate-200 hover:bg-slate-50 transition-all font-semibold text-zinc-700 cursor-pointer"
+                              >
+                                <Boxes size={12} className="text-zinc-500" />
+                                <span>{itemsCount}</span>
+                              </button>
+                            </td>
+                            <td className="p-3 w-16 text-center align-middle border-b border-zinc-200">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenLogs(order)}
+                                className="p-1 rounded hover:bg-zinc-200 text-zinc-600 hover:text-zinc-950 transition-all cursor-pointer"
+                              >
+                                <History size={16} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
-          {activeTab === "pending" && (
-            <CustomButton variant="default" onClick={() => setIsMapOpen(true)}>
-              <MapPin size={14} />
-              Track on Map
+        </div>
+      )}
+
+      {/* TAB CONTENT: RETURN ORDER */}
+      {activeTab === "return" && (
+        <div className="flex flex-col gap-4 animate-tableFadeInOnly">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1 border-b border-slate-200 pb-2">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveReturnTab("pending")}
+                className={`px-4 py-2 font-primary text-xs font-bold border-b-2 transition-all duration-200 cursor-pointer ${
+                  activeReturnTab === "pending"
+                    ? "border-[#0B57D0] text-[#0B57D0]"
+                    : "border-transparent text-zinc-400 hover:text-zinc-700"
+                }`}
+              >
+                Pending
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveReturnTab("complete")}
+                className={`px-4 py-2 font-primary text-xs font-bold border-b-2 transition-all duration-200 cursor-pointer ${
+                  activeReturnTab === "complete"
+                    ? "border-[#0B57D0] text-[#0B57D0]"
+                    : "border-transparent text-zinc-400 hover:text-zinc-700"
+                }`}
+              >
+                Complete
+              </button>
+            </div>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-zinc-600 self-end sm:self-auto">
+              {sortedReturnOrders.length} Returns
+            </span>
+          </div>
+
+          <div className="h-[500px] w-full relative">
+            {sortedReturnOrders.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full bg-[#F0F4F9]/40 border border-dashed border-slate-200 rounded select-none">
+                <Boxes size={40} className="text-zinc-400 mb-3" />
+                <span className="font-primary text-sm text-zinc-500 font-medium">
+                  No return orders found. Click Create Return from the Create Order tab.
+                </span>
+              </div>
+            ) : (
+              <div className="h-full overflow-auto border border-slate-200 rounded bg-white">
+                <table className="w-full text-left font-primary text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 text-zinc-700 font-bold border-b border-slate-200 h-12">
+                      <th className="sticky top-0 bg-slate-50 p-3 w-28 align-middle z-10"></th>
+                      <th className="sticky top-0 bg-slate-50 p-3 w-16 text-center align-middle z-10">Mark</th>
+                      <th className="sticky top-0 bg-slate-50 p-3 w-32 align-middle z-10">Status</th>
+                      <th className="sticky top-0 bg-slate-50 p-3 w-44 align-middle z-10">Ref Number</th>
+                      <th className="sticky top-0 bg-slate-50 p-3 w-56 align-middle z-10">Return Collect from</th>
+                      <th className="sticky top-0 bg-slate-50 p-3 w-36 align-middle z-10">Collect Method</th>
+                      <th className="sticky top-0 bg-slate-50 p-3 w-32 align-middle z-10">Due Date</th>
+                      <th className="sticky top-0 bg-slate-50 p-3 w-20 text-center align-middle z-10">Items</th>
+                      <th className="sticky top-0 bg-slate-50 p-3 w-16 text-center align-middle z-10">Logs</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-200">
+                    {sortedReturnOrders.map((order, idx) => {
+                      let itemsCount = 0;
+                      let parsedItems: SKUItem[] = [];
+                      try {
+                        parsedItems = typeof order.Items === "string" ? JSON.parse(order.Items) : order.Items;
+                        itemsCount = parsedItems.reduce((acc: number, curr: SKUItem) => acc + curr.qty, 0);
+                      } catch (_) {}
+
+                      let statusBadge = "bg-zinc-100 text-zinc-700 border-zinc-300";
+                      if (order.Status === "Pending") {
+                        statusBadge = "bg-amber-50 text-amber-700 border-amber-200";
+                      } else if (order.Status === "Collected") {
+                        statusBadge = "bg-blue-50 text-blue-700 border-blue-200";
+                      } else if (order.Status === "Complete") {
+                        statusBadge = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                      }
+
+                      const formatDateStr = (ts: any) => {
+                        if (!ts) return "—";
+                        const d = new Date(Number(ts));
+                        const day = String(d.getDate()).padStart(2, "0");
+                        const month = String(d.getMonth() + 1).padStart(2, "0");
+                        const year = d.getFullYear();
+                        return `${day}/${month}/${year}`;
+                      };
+
+                      return (
+                        <tr 
+                          key={order.ID} 
+                          className={`transition-all h-14 ${
+                            idx % 2 === 0 ? "bg-[#FFFFFF]" : "bg-[#F8F9FA]"
+                          } hover:bg-slate-50`}
+                        >
+                          <td className="p-3 w-36 align-middle flex items-center gap-1.5 h-14 border-b border-zinc-200">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteReturnOrder(order)}
+                              title="Delete Return"
+                              className="w-7 h-7 flex items-center justify-center rounded border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 cursor-pointer transition-all outline-none"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openEditReturnPanel(order)}
+                              title="Edit Return"
+                              className="w-7 h-7 flex items-center justify-center rounded border border-zinc-300 bg-white hover:bg-zinc-100 text-zinc-700 cursor-pointer transition-all outline-none"
+                            >
+                              <Pencil size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleTriggerChangeStatus(order)}
+                              title="Change Status (Overwrite)"
+                              className="w-7 h-7 flex items-center justify-center rounded border border-zinc-300 bg-white hover:bg-zinc-100 text-zinc-700 cursor-pointer transition-all outline-none"
+                            >
+                              <History size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleTriggerCompleteReturnOrder(order)}
+                              disabled={order.Status !== "Return Collected"}
+                              title={order.Status !== "Return Collected" ? "Cannot complete until status is Return Collected" : "Mark as Complete"}
+                              className={`w-7 h-7 flex items-center justify-center rounded border transition-all outline-none ${
+                                order.Status !== "Return Collected" 
+                                  ? "border-zinc-200 bg-zinc-50 text-zinc-400 cursor-not-allowed opacity-50"
+                                  : "border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 cursor-pointer"
+                              }`}
+                            >
+                              <CheckCircle size={12} />
+                            </button>
+                          </td>
+                          <td className="p-3 w-16 text-center font-bold text-zinc-800 align-middle border-b border-zinc-200">
+                            {order.Mark}
+                          </td>
+                          <td className="p-3 w-32 align-middle border-b border-zinc-200">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded border text-[10px] font-bold ${statusBadge}`}>
+                              {order.Status || "Pending"}
+                            </span>
+                          </td>
+                          <td className="p-3 w-44 font-semibold text-zinc-850 align-middle border-b border-zinc-200">
+                            {order.Ref_Number || order.DO_Number}
+                          </td>
+                          <td className="p-3 w-56 text-zinc-700 font-semibold align-middle border-b border-zinc-200" title={order.Deliver_To}>
+                            {truncateCharacters(order.Deliver_To, 12)}
+                          </td>
+                          <td className="p-3 w-36 text-zinc-700 font-semibold align-middle border-b border-zinc-200" title={order.Deliver_Method}>
+                            {order.Deliver_Method || "—"}
+                          </td>
+                          <td className="p-3 w-32 text-zinc-700 font-semibold align-middle border-b border-zinc-200">
+                            {formatDateStr(order.Deadline)}
+                          </td>
+                          <td className="p-3 w-20 text-center align-middle border-b border-zinc-200">
+                            <button
+                              type="button"
+                              onClick={() => openItemsPanel("view", order.ID, parsedItems)}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white border border-slate-200 hover:bg-slate-50 transition-all font-semibold text-zinc-700 cursor-pointer"
+                            >
+                              <Boxes size={12} className="text-zinc-500" />
+                              <span>{itemsCount}</span>
+                            </button>
+                          </td>
+                          <td className="p-3 w-16 text-center align-middle border-b border-zinc-200">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenLogs(order)}
+                              className="p-1 rounded hover:bg-zinc-200 text-zinc-600 hover:text-zinc-950 transition-all cursor-pointer"
+                            >
+                              <History size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB CONTENT: CREATE ORDER */}
+      {activeTab === "create" && (
+        <div className="flex flex-col gap-4 animate-tableFadeInOnly">
+          {/* Action buttons wrapper */}
+          <div className="flex flex-wrap gap-3 items-center bg-slate-50 border border-slate-200 rounded p-4">
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept=".pdf"
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+            <CustomButton 
+              variant="secondary"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={pdfLoading}
+              className="h-10 text-xs font-bold uppercase tracking-wider relative overflow-hidden"
+            >
+              <Upload size={14} />
+              Import Order
+              {pdfLoading && (
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600 animate-[pulse_1s_infinite]" />
+              )}
             </CustomButton>
-          )}
-          {activeTab === "return" && (
+
+            <CustomButton 
+              variant="dark"
+              onClick={() => {
+                setCreateDoNumber(`DO-${Date.now()}`);
+                setCreateRefNumber("");
+                setCreateMark(getNextAvailableMark(drafts, pendingOrders));
+                setCreateType("Normal");
+                setCreateDeliverTo("");
+                setCreatePoscode("");
+                setCreateItems([]);
+                setIsCreatePanelOpen(true);
+              }}
+              className="h-10 text-xs font-bold uppercase tracking-wider"
+            >
+              <Plus size={14} />
+              Create Order
+            </CustomButton>
+
             <CustomButton 
               variant="default"
               onClick={openCreateReturnPanel}
+              className="h-10 text-xs font-bold uppercase tracking-wider"
             >
               <Plus size={14} />
               Create Return
             </CustomButton>
-          )}
-        </div>
-      </div>
+          </div>
 
-      {/* TAB CONTENT: CREATE ORDER */}
-      {activeTab === "create" && (
-        <div className="flex flex-col gap-4">
           <div className="flex justify-between items-center px-1">
             <h3 className="font-primary text-base font-bold text-zinc-800">
               Draft Delivery Orders
             </h3>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-zinc-200 text-zinc-600">
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-zinc-600">
               {drafts.length} Drafts
             </span>
           </div>
 
           <div className="h-[500px] w-full relative">
             {drafts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full bg-[#E5E5E5]/20 border border-dashed border-zinc-300 rounded-lg select-none">
+              <div className="flex flex-col items-center justify-center h-full bg-[#F0F4F9]/40 border border-dashed border-slate-200 rounded select-none">
                 <FileText size={40} className="text-zinc-400 mb-3" />
                 <span className="font-primary text-sm text-zinc-500 font-medium">
-                  No draft orders. Upload a Delivery Order PDF to get started.
+                  No draft orders. Upload a Delivery Order PDF or click Create Order to start.
                 </span>
               </div>
             ) : (
-              <div className="h-full overflow-auto border border-zinc-300 rounded-lg bg-[#EEEEEE]/10">
+              <div className="h-full overflow-auto border border-slate-200 rounded bg-white">
                 <table className="w-full text-left font-primary text-xs border-collapse">
                   <thead>
-                    <tr className="bg-[#E5E5E5] text-zinc-700 font-bold border-b border-zinc-300 h-12">
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-20 align-middle z-10"></th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-16 text-center align-middle z-10">Mark</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-56 align-middle z-10">DO & Ref Number</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-36 align-middle z-10">Type</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-40 align-middle z-10">Deliver To</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-28 text-center align-middle z-10">Poscode</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-40 align-middle z-10">Method</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-20 text-center align-middle z-10">Items</th>
+                    <tr className="bg-slate-50 text-zinc-700 font-bold border-b border-slate-200 h-12">
+                      <th className="sticky top-0 bg-slate-50 p-3 w-20 align-middle z-10"></th>
+                      <th className="sticky top-0 bg-slate-50 p-3 w-16 text-center align-middle z-10">Mark</th>
+                      <th className="sticky top-0 bg-slate-50 p-3 w-56 align-middle z-10">DO & Ref Number</th>
+                      <th className="sticky top-0 bg-slate-50 p-3 w-36 align-middle z-10">Type</th>
+                      <th className="sticky top-0 bg-slate-50 p-3 w-40 align-middle z-10">Deliver To</th>
+                      <th className="sticky top-0 bg-slate-50 p-3 w-28 text-center align-middle z-10">Poscode</th>
+                      <th className="sticky top-0 bg-slate-50 p-3 w-40 align-middle z-10">Method</th>
+                      <th className="sticky top-0 bg-slate-50 p-3 w-20 text-center align-middle z-10">Items</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-200">
@@ -2075,7 +3022,7 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
                         key={draft.id} 
                         className={`transition-all ${
                           idx % 2 === 0 ? "bg-[#FFFFFF]" : "bg-[#F8F9FA]"
-                        } hover:bg-[#E5E5E5]/20`}
+                        } hover:bg-slate-50`}
                       >
                         <td className="p-3 w-20 align-middle flex items-center gap-1.5 border-b border-zinc-200">
                           <CustomButton
@@ -2169,7 +3116,7 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
                         <td className="p-3 w-20 text-center align-middle border-b border-zinc-200">
                           {(() => {
                             const { hasDuplicate, hasLoose } = checkOrderIssues(draft.items);
-                            let btnStyle = "bg-[#EEEEEE] border-zinc-300 text-zinc-700 hover:bg-[#E5E5E5]";
+                            let btnStyle = "bg-white border-slate-200 text-zinc-700 hover:bg-slate-50";
                             let tooltip = "Edit Items List";
                             if (hasDuplicate) {
                               btnStyle = "bg-red-50 border-red-300 text-red-750 hover:bg-red-100 animate-pulse";
@@ -2193,499 +3140,6 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
                         </td>
                       </tr>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* TAB CONTENT: PENDING */}
-      {activeTab === "pending" && (
-        <div className="flex flex-col gap-4">
-          
-          {/* Left Table Section (Full 100% width) */}
-          <div className="flex justify-between items-center px-1">
-            <h3 className="font-primary text-base font-bold text-zinc-800">
-              Active Deliveries
-            </h3>
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-zinc-200 text-zinc-600">
-                {sortedPendingOrders.length} Pending
-              </span>
-            </div>
-          </div>
-
-          <div className="h-[500px] w-full relative">
-            {sortedPendingOrders.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full bg-[#E5E5E5]/20 border border-dashed border-zinc-300 rounded-lg select-none">
-                <Boxes size={40} className="text-zinc-400 mb-3" />
-                <span className="font-primary text-sm text-zinc-500 font-medium">
-                  No pending deliveries. Create and send orders from the Create tab.
-                </span>
-              </div>
-            ) : (
-              <div className="h-full overflow-auto border border-zinc-300 rounded-lg bg-[#EEEEEE]/10">
-                <table className="w-full text-left font-primary text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-[#E5E5E5] text-zinc-700 font-bold border-b border-zinc-300 h-12">
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-20 align-middle z-10"></th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-36 align-middle z-10">Status</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-16 text-center align-middle z-10">Mark</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-56 align-middle z-10">DO & Ref Number</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-36 align-middle z-10">Type</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-36 align-middle z-10">Deliver To</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-28 text-center align-middle z-10">Poscode</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-36 align-middle z-10">Method</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-20 text-center align-middle z-10">Items</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-16 text-center align-middle z-10">Logs</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-200">
-                    {sortedPendingOrders.map((order, idx) => {
-                      let itemsCount = 0;
-                      let parsedItems: SKUItem[] = [];
-                      try {
-                        parsedItems = typeof order.Items === "string" ? JSON.parse(order.Items) : order.Items;
-                        itemsCount = parsedItems.reduce((acc: number, curr: SKUItem) => acc + curr.qty, 0);
-                      } catch (_) {}
-
-                      // Map status labels to styling
-                      let statusBadge = "bg-zinc-100 text-zinc-700 border-zinc-300";
-                      if (order.Status === "Ready to Pick") {
-                        statusBadge = "bg-blue-50 text-blue-700 border-blue-200";
-                      } else if (order.Status === "Picking") {
-                        statusBadge = "bg-amber-50 text-amber-700 border-amber-200";
-                      } else if (order.Status === "Ready to Deliver") {
-                        statusBadge = "bg-indigo-50 text-indigo-700 border-indigo-200";
-                      } else if (order.Status === "Load") {
-                        statusBadge = "bg-purple-50 text-purple-700 border-purple-200";
-                      } else if (order.Status === "Out for Delivery") {
-                        statusBadge = "bg-pink-50 text-pink-700 border-pink-200";
-                      } else if (order.Status === "Delivered") {
-                        statusBadge = "bg-emerald-50 text-emerald-700 border-emerald-200";
-                      }
-
-                      return (
-                        <tr 
-                          key={order.ID} 
-                          className={`transition-all h-14 ${
-                            idx % 2 === 0 ? "bg-[#FFFFFF]" : "bg-[#F8F9FA]"
-                          } hover:bg-[#E5E5E5]/20`}
-                        >
-                          <td className="p-3 w-20 align-middle flex items-center gap-1.5 h-14 border-b border-zinc-200">
-                            <CustomButton
-                              variant="secondary"
-                              onClick={() => handleRevokeOrder(order)}
-                              title="Revoke and send back to drafts"
-                              className="w-8 h-8 !px-0 flex items-center justify-center aspect-square"
-                            >
-                              <Undo size={12} className="text-zinc-600" />
-                            </CustomButton>
-                            <CustomButton
-                              variant="default"
-                              onClick={() => handleCompleteOrder(order)}
-                              disabled={order.Status !== "Delivered"}
-                              title={order.Status !== "Delivered" ? "Cannot complete until status is Delivered" : "Verify and archive"}
-                              className="w-8 h-8 !px-0 flex items-center justify-center aspect-square"
-                            >
-                              <CheckCircle size={12} className="text-emerald-600" />
-                            </CustomButton>
-                          </td>
-                          <td className="p-3 w-36 align-middle border-b border-zinc-200">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded border text-[10px] font-bold ${statusBadge}`}>
-                              {order.Status || "Ready to Pick"}
-                            </span>
-                          </td>
-                          <td className="p-3 w-16 text-center font-semibold text-zinc-800 align-middle border-b border-zinc-200">
-                            {order.Mark}
-                          </td>
-                          <td className="p-3 w-56 font-semibold text-zinc-800 align-middle border-b border-zinc-200">
-                            {order.DO_Number}
-                            {order.Ref_Number ? `_${order.Ref_Number}` : ""}
-                          </td>
-                          <td className="p-3 w-36 align-middle border-b border-zinc-200">
-                            {renderTypeCell(order)}
-                          </td>
-                          <td className="p-3 w-36 text-zinc-500 align-middle border-b border-zinc-200" title={order.Deliver_To}>
-                            {truncateCharacters(order.Deliver_To)}
-                          </td>
-                          <td className="p-3 w-28 text-center text-zinc-500 align-middle border-b border-zinc-200">
-                            {renderPoscodeCell(order.Poscode)}
-                          </td>
-                          <td className="p-3 w-36 align-middle border-b border-zinc-200 text-zinc-500">
-                            {order.Deliver_Method || "Company Delivery"}
-                          </td>
-                          <td className="p-3 w-20 text-center align-middle border-b border-zinc-200">
-                            <button
-                              type="button"
-                              onClick={() => openItemsPanel("view", order.ID, parsedItems)}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#EEEEEE] border border-zinc-300 hover:bg-[#E5E5E5] transition-all font-semibold text-zinc-700 cursor-pointer"
-                            >
-                              <Boxes size={12} className="text-zinc-500" />
-                              <span>{itemsCount}</span>
-                            </button>
-                          </td>
-                          <td className="p-3 w-16 text-center align-middle border-b border-zinc-200">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenLogs(order)}
-                              className="p-1 rounded hover:bg-zinc-200 text-zinc-600 hover:text-zinc-950 transition-all cursor-pointer"
-                            >
-                              <History size={16} />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {/* Slide-in Map Panel Drawer (65% screen width) */}
-          <div 
-            className={`fixed top-0 right-0 h-screen w-[65vw] bg-[#EEEEEE] shadow-2xl border-l border-zinc-300 z-50 transform transition-transform duration-300 ease-in-out ${
-              isMapOpen ? "translate-x-0" : "translate-x-full"
-            }`}
-          >
-            <div className="flex flex-col h-full">
-              {/* Panel Header */}
-              <div className="p-4 border-b border-zinc-300 flex items-center justify-between bg-zinc-100 font-primary">
-                <div>
-                  <h4 className="font-primary text-sm font-bold text-zinc-800">
-                    Track Orders
-                  </h4>
-                </div>
-                <button
-                  onClick={() => setIsMapOpen(false)}
-                  className="p-1 rounded hover:bg-zinc-200 text-zinc-500 hover:text-zinc-800 cursor-pointer"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              {/* Panel Map Area */}
-              <div className="flex-1 relative bg-[#E0E0E0] overflow-hidden">
-                <div id="leaflet-map" className="w-full h-full z-10" />
-                {!leafletLoaded && (
-                  <div className="absolute inset-0 bg-[#E0E0E0] flex items-center justify-center z-20">
-                    <span className="font-primary text-xs text-zinc-500 font-semibold animate-pulse">
-                      Loading Map...
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Map Legend */}
-              <div className="p-4 border-t border-zinc-300 bg-zinc-100 flex flex-col md:flex-row md:items-center justify-between gap-3 font-primary">
-                <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[10px] text-zinc-650 font-bold">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#9CA3AF] border border-zinc-400" />
-                    <span>Preparing Goods</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#18181B] border border-zinc-700" />
-                    <span>Goods Ready</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#EF4444] border border-red-500" />
-                    <span>Driver Deliver or Collect Goods</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#10B981] border border-emerald-600" />
-                    <span>Complete Job</span>
-                  </div>
-                </div>
-
-                <CustomButton variant="secondary" onClick={() => setIsMapOpen(false)}>
-                  Close Map
-                </CustomButton>
-              </div>
-
-            </div>
-          </div>
-
-        </div>
-      )}
-
-      {/* TAB CONTENT: COMPLETE */}
-      {activeTab === "complete" && (
-        <div className="flex flex-col gap-4">
-          <div className="flex justify-between items-center px-1">
-            <h3 className="font-primary text-base font-bold text-zinc-800">
-              Archived & Delivered Orders
-            </h3>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-zinc-200 text-zinc-600">
-              {completedOrders.length} Completed
-            </span>
-          </div>
-
-          <div className="h-[500px] w-full relative">
-            {completedOrders.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full bg-[#E5E5E5]/20 border border-dashed border-zinc-300 rounded-lg select-none">
-                <CheckCircle size={40} className="text-zinc-400 mb-3" />
-                <span className="font-primary text-sm text-zinc-500 font-medium">
-                  No completed orders. Archive deliveries from the Pending tab.
-                </span>
-              </div>
-            ) : (
-              <div className="h-full overflow-auto border border-zinc-300 rounded-lg bg-[#EEEEEE]/10">
-                <table className="w-full text-left font-primary text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-[#E5E5E5] text-zinc-700 font-bold border-b border-zinc-300 h-12">
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-40 align-middle z-10">Delivered (date time)</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-36 align-middle z-10">Status</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-20 text-center align-middle z-10">Mark</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-56 align-middle z-10">DO & Ref Number</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-36 align-middle z-10">Deliver To</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-28 text-center align-middle z-10">Poscode</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-36 align-middle z-10">Method</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-20 text-center align-middle z-10">Items</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-16 text-center align-middle z-10">Logs</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-200">
-                    {completedOrders.map((order, idx) => {
-                      let itemsCount = 0;
-                      let parsedItems: SKUItem[] = [];
-                      try {
-                        parsedItems = typeof order.Items === "string" ? JSON.parse(order.Items) : order.Items;
-                        itemsCount = parsedItems.reduce((acc: number, curr: SKUItem) => acc + curr.qty, 0);
-                      } catch (_) {}
-
-                      // Get the Delivered timestamp (when the driver changed it to Delivered)
-                      // If no Delivered_At is saved separately, fallback to logs or when admin completed it.
-                      let deliveredTs = order.Delivered_At;
-                      if (!deliveredTs) {
-                        // Attempt to search logs for "Delivered" status timestamp
-                        let logsArr: LogEntry[] = [];
-                        try {
-                          logsArr = typeof order.Logs === "string" ? JSON.parse(order.Logs) : order.Logs;
-                          const match = logsArr.find((l) => l.action.toLowerCase() === "delivered" || l.action.includes("Delivered"));
-                          if (match) deliveredTs = match.timestamp;
-                        } catch (_) {}
-                      }
-                      if (!deliveredTs) {
-                        // Fallback to order completed timestamp
-                        deliveredTs = order.Timestamp; 
-                      }
-
-                      return (
-                        <tr 
-                          key={order.ID} 
-                          className={`transition-all h-14 ${
-                            idx % 2 === 0 ? "bg-[#FFFFFF]" : "bg-[#F8F9FA]"
-                          } hover:bg-[#E5E5E5]/20`}
-                        >
-                          <td className="p-3 w-40 font-semibold text-zinc-700 align-middle border-b border-zinc-200">
-                            {formatTimestamp(deliveredTs)}
-                          </td>
-                          <td className="p-3 w-36 align-middle border-b border-zinc-200">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded border text-[10px] font-bold bg-emerald-50 text-emerald-700 border-emerald-200">
-                              Delivered
-                            </span>
-                          </td>
-                          <td className="p-3 w-20 text-center font-semibold text-zinc-800 align-middle border-b border-zinc-200">
-                            {order.Mark}
-                          </td>
-                          <td className="p-3 w-56 font-semibold text-zinc-950 align-middle border-b border-zinc-200">
-                            {order.DO_Number}
-                            {order.Ref_Number ? `_${order.Ref_Number}` : ""}
-                          </td>
-                          <td className="p-3 w-36 text-zinc-500 align-middle border-b border-zinc-200" title={order.Deliver_To}>
-                            {truncateCharacters(order.Deliver_To)}
-                          </td>
-                          <td className="p-3 w-28 text-center text-zinc-500 align-middle border-b border-zinc-200">
-                            {renderPoscodeCell(order.Poscode)}
-                          </td>
-                          <td className="p-3 w-36 align-middle border-b border-zinc-200 text-zinc-500">
-                            {order.Deliver_Method || "Company Delivery"}
-                          </td>
-                          <td className="p-3 w-20 text-center align-middle border-b border-zinc-200">
-                            <button
-                              type="button"
-                              onClick={() => openItemsPanel("view", order.ID, parsedItems)}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#EEEEEE] border border-zinc-300 hover:bg-[#E5E5E5] transition-all font-semibold text-zinc-700 cursor-pointer"
-                            >
-                              <Boxes size={12} className="text-zinc-500" />
-                              <span>{itemsCount}</span>
-                            </button>
-                          </td>
-                          <td className="p-3 w-16 text-center align-middle border-b border-zinc-200">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenLogs(order)}
-                              className="p-1 rounded hover:bg-zinc-200 text-zinc-600 hover:text-zinc-950 transition-all cursor-pointer"
-                            >
-                              <History size={16} />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* TAB CONTENT: RETURN ORDER */}
-      {activeTab === "return" && (
-        <div className="flex flex-col gap-4">
-          <div className="flex justify-between items-center px-1">
-            <h3 className="font-primary text-base font-bold text-zinc-800">
-              Return Orders
-            </h3>
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-1.5 text-xs font-semibold text-zinc-650 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={showCompleteReturns}
-                  onChange={(e) => setShowCompleteReturns(e.target.checked)}
-                  className="rounded border-zinc-300 text-zinc-800 focus:ring-zinc-400 w-3.5 h-3.5"
-                />
-                Show Complete
-              </label>
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-zinc-200 text-zinc-600">
-                {sortedReturnOrders.length} Returns
-              </span>
-            </div>
-          </div>
-
-          <div className="h-[500px] w-full relative">
-            {sortedReturnOrders.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full bg-[#E5E5E5]/20 border border-dashed border-zinc-300 rounded-lg select-none">
-                <Boxes size={40} className="text-zinc-400 mb-3" />
-                <span className="font-primary text-sm text-zinc-500 font-medium">
-                  No return orders found. Click Create Return to start.
-                </span>
-              </div>
-            ) : (
-              <div className="h-full overflow-auto border border-zinc-300 rounded-lg bg-[#EEEEEE]/10">
-                <table className="w-full text-left font-primary text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-[#E5E5E5] text-zinc-700 font-bold border-b border-zinc-300 h-12">
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-28 align-middle z-10"></th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-16 text-center align-middle z-10">Mark</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-32 align-middle z-10">Status</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-44 align-middle z-10">Ref Number</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-56 align-middle z-10">Return Collect from</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-32 align-middle z-10">Due Date</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-20 text-center align-middle z-10">Items</th>
-                      <th className="sticky top-0 bg-[#E5E5E5] p-3 w-16 text-center align-middle z-10">Logs</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-200">
-                    {sortedReturnOrders.map((order, idx) => {
-                      let itemsCount = 0;
-                      let parsedItems: SKUItem[] = [];
-                      try {
-                        parsedItems = typeof order.Items === "string" ? JSON.parse(order.Items) : order.Items;
-                        itemsCount = parsedItems.reduce((acc: number, curr: SKUItem) => acc + curr.qty, 0);
-                      } catch (_) {}
-
-                      // Map status labels to styling
-                      let statusBadge = "bg-zinc-100 text-zinc-700 border-zinc-300";
-                      if (order.Status === "Pending") {
-                        statusBadge = "bg-amber-50 text-amber-700 border-amber-200";
-                      } else if (order.Status === "Collected") {
-                        statusBadge = "bg-blue-50 text-blue-700 border-blue-200";
-                      } else if (order.Status === "Complete") {
-                        statusBadge = "bg-emerald-50 text-emerald-700 border-emerald-200";
-                      }
-
-                      // Format epoch date to dd/mm/yyyy
-                      const formatDateStr = (ts: any) => {
-                        if (!ts) return "—";
-                        const d = new Date(Number(ts));
-                        const day = String(d.getDate()).padStart(2, "0");
-                        const month = String(d.getMonth() + 1).padStart(2, "0");
-                        const year = d.getFullYear();
-                        return `${day}/${month}/${year}`;
-                      };
-
-                      return (
-                        <tr 
-                          key={order.ID} 
-                          className={`transition-all h-14 ${
-                            idx % 2 === 0 ? "bg-[#FFFFFF]" : "bg-[#F8F9FA]"
-                          } hover:bg-[#E5E5E5]/20`}
-                        >
-                          <td className="p-3 w-28 align-middle flex items-center gap-1.5 h-14 border-b border-zinc-200">
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteReturnOrder(order)}
-                              title="Delete Return"
-                              className="w-7 h-7 flex items-center justify-center rounded border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 cursor-pointer transition-all outline-none"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openEditReturnPanel(order)}
-                              title="Edit Return"
-                              className="w-7 h-7 flex items-center justify-center rounded border border-zinc-300 bg-white hover:bg-zinc-100 text-zinc-700 cursor-pointer transition-all outline-none"
-                            >
-                              <Pencil size={12} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleCompleteReturnOrder(order)}
-                              disabled={order.Status === "Complete"}
-                              title={order.Status === "Complete" ? "Return is already complete" : "Mark as Complete"}
-                              className={`w-7 h-7 flex items-center justify-center rounded border transition-all outline-none ${
-                                order.Status === "Complete" 
-                                  ? "border-zinc-200 bg-zinc-50 text-zinc-450 cursor-not-allowed opacity-50"
-                                  : "border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 cursor-pointer"
-                              }`}
-                            >
-                              <CheckCircle size={12} />
-                            </button>
-                          </td>
-                          <td className="p-3 w-16 text-center font-bold text-zinc-800 align-middle border-b border-zinc-200">
-                            {order.Mark}
-                          </td>
-                          <td className="p-3 w-32 align-middle border-b border-zinc-200">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded border text-[10px] font-bold ${statusBadge}`}>
-                              {order.Status || "Pending"}
-                            </span>
-                          </td>
-                          <td className="p-3 w-44 font-semibold text-zinc-850 align-middle border-b border-zinc-200">
-                            {order.Ref_Number || order.DO_Number}
-                          </td>
-                          <td className="p-3 w-56 text-zinc-700 font-semibold align-middle border-b border-zinc-200" title={order.Deliver_To}>
-                            {truncateCharacters(order.Deliver_To, 12)}
-                          </td>
-                          <td className="p-3 w-32 text-zinc-700 font-semibold align-middle border-b border-zinc-200">
-                            {formatDateStr(order.Deadline)}
-                          </td>
-                          <td className="p-3 w-20 text-center align-middle border-b border-zinc-200">
-                            <button
-                              type="button"
-                              onClick={() => openItemsPanel("view", order.ID, parsedItems)}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#EEEEEE] border border-zinc-300 hover:bg-[#E5E5E5] transition-all font-semibold text-zinc-700 cursor-pointer"
-                            >
-                              <Boxes size={12} className="text-zinc-500" />
-                              <span>{itemsCount}</span>
-                            </button>
-                          </td>
-                          <td className="p-3 w-16 text-center align-middle border-b border-zinc-200">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenLogs(order)}
-                              className="p-1 rounded hover:bg-zinc-200 text-zinc-600 hover:text-zinc-950 transition-all cursor-pointer"
-                            >
-                              <History size={16} />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
                   </tbody>
                 </table>
               </div>
@@ -2866,7 +3320,7 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
 
                     {selectedOrder ? (
                       <div className="flex flex-wrap gap-2 mt-1.5">
-                        {getLogImagesForAction(log.action, selectedOrder).map((url, imgIdx) => (
+                        {getLogImagesForAction(log.action, selectedOrder, log.photoUrl).map((url, imgIdx) => (
                           <div 
                             key={imgIdx} 
                             onClick={() => setActiveLightboxImage(url)}
@@ -2904,11 +3358,19 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
       {/* CREATE ORDER SLIDE-IN PANEL (Drawer) */}
       <SlidePanel
         isOpen={isCreatePanelOpen}
-        onClose={() => setIsCreatePanelOpen(false)}
-        title="Create New Track Order"
+        onClose={() => {
+          setIsCreatePanelOpen(false);
+          resetCreateForm();
+          setEditingOrder(null);
+        }}
+        title={editingOrder ? `Edit Track Order : ${createDoNumber}` : "Create New Track Order"}
         footer={
           <>
-            <CustomButton variant="secondary" onClick={() => setIsCreatePanelOpen(false)}>
+            <CustomButton variant="secondary" onClick={() => {
+              setIsCreatePanelOpen(false);
+              resetCreateForm();
+              setEditingOrder(null);
+            }}>
               Cancel
             </CustomButton>
             <CustomButton 
@@ -2916,7 +3378,7 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
               onClick={(e) => handleCreateOrderSubmit(e)}
               disabled={!createDoNumber || !createDeliverTo || !createPoscode || !createMark}
             >
-              Add to Drafts
+              {editingOrder ? "Save Changes" : "Create Order"}
             </CustomButton>
           </>
         }
@@ -3041,7 +3503,7 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
               <button
                 type="button"
                 onClick={() => setCreateItems([...createItems, { sku: "", qty: 1 }])}
-                className="px-2 py-1 rounded bg-[#E5E5E5] hover:bg-[#D5D5D5] border border-zinc-300 flex items-center gap-1 font-semibold text-zinc-700 cursor-pointer"
+                className="px-2 py-1 rounded bg-white hover:bg-slate-50 border border-slate-200 flex items-center gap-1 font-semibold text-zinc-700 cursor-pointer"
               >
                 <Plus size={12} />
                 Add SKU
@@ -3129,7 +3591,7 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
             <CustomButton 
               variant="dark" 
               onClick={(e) => handleReturnSubmit(e)}
-              disabled={!returnRefNumber || !returnLocation || !returnCollectBeforeDate || !returnMark}
+              disabled={!returnRefNumber || !returnLocation || !returnPoscode || !returnCollectBeforeDate || !returnMark || !returnCollectMethod}
             >
               {editingReturn ? "Save Changes" : "Create Return"}
             </CustomButton>
@@ -3149,10 +3611,10 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
           </div>
 
           <div className="flex flex-col gap-1 relative">
-            <label className="font-bold text-zinc-700">Return Location (Store or Postcode) *</label>
+            <label className="font-bold text-zinc-700">Return Location (Store Name) *</label>
             <input
               type="text"
-              placeholder="Type postcode or store ID/name..."
+              placeholder="Search or type store..."
               value={returnLocation}
               onChange={(e) => {
                 setReturnLocation(e.target.value);
@@ -3160,6 +3622,31 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
                 setShowStoreDropdown(true);
               }}
               onFocus={() => setShowStoreDropdown(true)}
+              onBlur={() => {
+                // Allow clicking dropdown items first
+                setTimeout(() => {
+                  setShowStoreDropdown(false);
+                  const trimmed = returnLocation.trim();
+                  if (trimmed) {
+                    const matchedStore = stores.find(
+                      s => String(s.ID).toLowerCase() === trimmed.toLowerCase() || 
+                           String(s["Display Name"]).toLowerCase() === trimmed.toLowerCase()
+                    );
+                    if (matchedStore) {
+                      const retailerId = matchedStore["Retailers ID"] !== undefined ? matchedStore["Retailers ID"] : matchedStore["Retailer ID"];
+                      const retailer = retailers.find(r => String(r.ID) === String(retailerId));
+                      const retailerName = retailer ? (retailer["Display Name"] || "") : "";
+                      const prefix = retailerName ? (retailerName.substring(0, 5) + " - ") : "";
+                      setReturnLocation(prefix + (matchedStore["Display Name"] || ""));
+                      
+                      const postcodeMatch = matchedStore.Address?.match(/\b\d{6}\b/);
+                      if (postcodeMatch && postcodeMatch[0]) {
+                        setReturnPoscode(postcodeMatch[0]);
+                      }
+                    }
+                  }
+                }, 200);
+              }}
               className="h-8 px-2.5 rounded border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-400 font-medium"
             />
             {showStoreDropdown && filteredStores.length > 0 && (
@@ -3170,15 +3657,59 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
                     type="button"
                     className="w-full text-left px-3 py-2 hover:bg-zinc-100 text-xs font-semibold text-zinc-700 border-b border-zinc-100 last:border-0 cursor-pointer"
                     onClick={() => {
-                      setReturnLocation(`${store.ID} - ${store["Display Name"]}`);
+                      const retailerId = store["Retailers ID"] !== undefined ? store["Retailers ID"] : store["Retailer ID"];
+                      const retailer = retailers.find(r => String(r.ID) === String(retailerId));
+                      const retailerName = retailer ? (retailer["Display Name"] || "") : "";
+                      const prefix = retailerName ? (retailerName.substring(0, 5) + " - ") : "";
+                      setReturnLocation(prefix + (store["Display Name"] || ""));
                       setShowStoreDropdown(false);
+                      
+                      // Extract postal code from store Address
+                      const postcodeMatch = store.Address?.match(/\b\d{6}\b/);
+                      if (postcodeMatch && postcodeMatch[0]) {
+                        setReturnPoscode(postcodeMatch[0]);
+                      }
                     }}
                   >
-                    {store.ID} - {store["Display Name"]}
+                    {store["Display Name"]}
                   </button>
                 ))}
               </div>
             )}
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="font-bold text-zinc-700">Singapore Postal Code *</label>
+            <input
+              type="text"
+              maxLength={6}
+              placeholder="6-digit postal code"
+              value={returnPoscode}
+              onChange={(e) => setReturnPoscode(e.target.value.replace(/\D/g, ""))}
+              className={`h-8 px-2.5 rounded border text-center font-semibold focus:outline-none focus:ring-1 focus:ring-zinc-400 ${
+                returnPoscode && !validatePoscode(returnPoscode)
+                  ? "border-red-400 bg-red-50 text-red-700"
+                  : "border-zinc-300 bg-white text-zinc-900"
+              }`}
+            />
+            {returnPoscode && validatePoscode(returnPoscode) && (
+              <span className="text-[10px] text-zinc-500 font-bold ml-1">
+                Zone: {getZoneFromPostcode(returnPoscode)}
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="font-bold text-zinc-700">Collect Method *</label>
+            <select
+              value={returnCollectMethod}
+              onChange={(e) => setReturnCollectMethod(e.target.value)}
+              className="h-8 px-2.5 rounded border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-400 font-semibold text-xs"
+            >
+              <option value="Company Vehicle">Company Vehicle</option>
+              <option value="3rd Party Vehicle">3rd Party Vehicle</option>
+              <option value="Self-Collect">Self-Collect</option>
+            </select>
           </div>
 
           <div className="flex gap-3">
@@ -3217,13 +3748,12 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
               <button
                 type="button"
                 onClick={() => setReturnItems([...returnItems, { sku: "", qty: 1 }])}
-                className="px-2 py-1 rounded bg-[#E5E5E5] hover:bg-[#D5D5D5] border border-zinc-300 flex items-center gap-1 font-semibold text-zinc-700 cursor-pointer"
+                className="px-2 py-1 rounded bg-white hover:bg-slate-50 border border-slate-200 flex items-center gap-1 font-semibold text-zinc-700 cursor-pointer"
               >
                 <Plus size={12} />
                 Add SKU
               </button>
             </div>
-
             <div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
               {returnItems.map((item, idx) => (
                 <div key={idx} className="flex gap-1.5 items-center bg-white p-2 rounded border border-zinc-300 shadow-xs">
@@ -3310,6 +3840,177 @@ export function TrackOrderModule({ profile }: TrackOrderModuleProps) {
           setPendingRevokeOrder(null);
         }}
       />
+
+      {/* CHANGE STATUS (OVERWRITE) MODAL */}
+      {isChangeStatusOpen && statusOrder && (
+        <div className="fixed inset-0 z-55 flex items-center justify-center bg-black/50 backdrop-blur-xs font-primary p-4">
+          <div className="bg-white rounded-xl shadow-lg border border-slate-200 max-w-sm w-full overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <span className="font-bold text-sm text-zinc-800">Change Status : {statusOrder.DO_Number}</span>
+              <button 
+                onClick={() => setIsChangeStatusOpen(false)}
+                className="text-zinc-400 hover:text-zinc-600 focus:outline-none cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-5 flex flex-col gap-4 text-xs">
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-zinc-700">Dropdown Status *</label>
+                <select
+                  value={newStatus}
+                  onChange={(e) => setNewStatus(e.target.value)}
+                  className="h-9 px-2.5 rounded-lg border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-400 font-medium"
+                >
+                  <option value="" disabled>Select Status</option>
+                  {statusOrder.Type === "Return" ? (
+                    <>
+                      <option value="Pending">Pending</option>
+                      <option value="Return Collected">Return Collected</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="Ready to Pick">Ready to Pick</option>
+                      <option value="Picking">Picking</option>
+                      <option value="Ready to Deliver">Ready to Deliver</option>
+                      <option value="Load">Load</option>
+                      <option value="Out for Delivery">Out for Delivery</option>
+                      <option value="Delivered">Delivered</option>
+                    </>
+                  )}
+                </select>
+              </div>
+              
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-zinc-700">Remark *</label>
+                <textarea
+                  placeholder="e.g. Changed status due to logistics update"
+                  value={statusRemark}
+                  onChange={(e) => setStatusRemark(e.target.value)}
+                  rows={3}
+                  className="p-2.5 rounded-lg border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-400 font-medium resize-none"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-zinc-700">Upload Image (Optional)</label>
+                <div className="flex items-center gap-2">
+                  <label className="h-8 px-3 rounded-lg border border-zinc-300 bg-[#E5E5E5] text-zinc-700 hover:text-zinc-950 hover:bg-[#EEEEEE]/50 transition-all select-none cursor-pointer flex items-center justify-center gap-1.5 font-bold text-[10px]">
+                    <Upload size={12} />
+                    {statusPhotoFile ? "Change Image" : "Choose File"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setStatusPhotoFile(e.target.files[0]);
+                        }
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+                  {statusPhotoFile && (
+                    <span className="text-[10px] text-zinc-500 font-medium truncate max-w-[200px]">
+                      {statusPhotoFile.name}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            <div className="px-5 py-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2">
+              <CustomButton 
+                variant="secondary" 
+                onClick={() => setIsChangeStatusOpen(false)}
+                disabled={statusPhotoUploading}
+              >
+                Cancel
+              </CustomButton>
+              <CustomButton 
+                variant="dark" 
+                onClick={handleSaveStatusOverwrite}
+                disabled={statusPhotoUploading || !newStatus || !statusRemark.trim()}
+              >
+                {statusPhotoUploading ? "Updating..." : "Update Status"}
+              </CustomButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM ORDER COMPLETE MODAL */}
+      {isCompleteConfirmOpen && pendingCompleteOrder && (
+        <div className="fixed inset-0 z-55 flex items-center justify-center bg-black/50 backdrop-blur-xs font-primary p-4">
+          <div className="bg-white rounded-xl shadow-lg border border-slate-200 max-w-sm w-full overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <span className="font-bold text-sm text-zinc-800">
+                {pendingCompleteOrder.Type === "Return" ? "Complete Return Order" : "Complete Delivery Order"}
+              </span>
+              <button 
+                onClick={() => setIsCompleteConfirmOpen(false)}
+                className="text-zinc-400 hover:text-zinc-600 focus:outline-none cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-5 flex flex-col gap-4 text-xs">
+              <p className="text-zinc-600 font-medium leading-relaxed">
+                {pendingCompleteOrder.Type === "Return"
+                  ? `Are you sure you want to mark return order ${pendingCompleteOrder.DO_Number} as complete?`
+                  : `Are you sure you want to archive and complete order ${pendingCompleteOrder.DO_Number}?`}
+              </p>
+              
+              <div className="flex flex-col gap-1.5 mt-2">
+                <label className="font-bold text-zinc-700">
+                  {pendingCompleteOrder.Type === "Return" ? "Insert Credit Note Number (Optional)" : "Insert Invoice Number (Optional)"}
+                </label>
+                {pendingCompleteOrder.Type === "Return" ? (
+                  <input
+                    type="text"
+                    placeholder="e.g. CN-98765"
+                    value={creditNoteInput}
+                    onChange={(e) => setCreditNoteInput(e.target.value)}
+                    className="h-9 px-2.5 rounded-lg border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-400 font-medium"
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    placeholder="e.g. INV-12345"
+                    value={invoiceNumberInput}
+                    onChange={(e) => setInvoiceNumberInput(e.target.value)}
+                    className="h-9 px-2.5 rounded-lg border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-400 font-medium"
+                  />
+                )}
+              </div>
+            </div>
+            
+            <div className="px-5 py-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
+              <CustomButton 
+                variant="secondary" 
+                onClick={() => setIsCompleteConfirmOpen(false)}
+              >
+                Cancel
+              </CustomButton>
+              
+              <div className="flex gap-2">
+                <CustomButton 
+                  variant="secondary" 
+                  onClick={handleSkipComplete}
+                >
+                  Skip
+                </CustomButton>
+                <CustomButton 
+                  variant="dark" 
+                  onClick={handleContinueComplete}
+                  disabled={pendingCompleteOrder.Type === "Return" ? !creditNoteInput.trim() : !invoiceNumberInput.trim()}
+                >
+                  Continue
+                </CustomButton>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* LIGHTBOX MODAL */}
       {activeLightboxImage && (

@@ -186,14 +186,7 @@ export function WelcomeAboardScreen({ profile, idToken, onLogout, onComplete }: 
 
       // Start Countdown
       timerIntervalRef.current = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            handleCancelSession();
-            showToast("Signing session expired. Please retry.", "error");
-            return 0;
-          }
-          return prev - 1;
-        });
+        setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
       }, 1000);
 
       // Start Polling
@@ -217,6 +210,14 @@ export function WelcomeAboardScreen({ profile, idToken, onLogout, onComplete }: 
       setLoading(false);
     }
   };
+
+  // Monitor countdown timer expiration
+  React.useEffect(() => {
+    if (timeLeft === 0 && showQrModal) {
+      handleCancelSession();
+      showToast("Signing session expired. Please retry.", "error");
+    }
+  }, [timeLeft, showQrModal, handleCancelSession]);
 
   // Cleanup timers on unmount
   React.useEffect(() => {

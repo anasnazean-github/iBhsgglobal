@@ -5,9 +5,7 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  allowedDevOrigins: ['192.168.50.*'],
+  allowedDevOrigins: ['localhost:3000', '192.168.100.*', '192.168.50.34', '192.168.50.*', '*.netlify.app', 'netlify.app'],
 };
-
-
 
 export default nextConfig;

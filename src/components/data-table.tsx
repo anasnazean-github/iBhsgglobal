@@ -510,7 +510,7 @@ export function DataTable({
       tabIndex={0}
       onKeyDown={handleGlobalKeyDown}
       onFocus={() => setIsFocused(true)}
-      className={`flex flex-col w-full ${height} rounded-lg bg-[#EEEEEE] border border-zinc-300 shadow-sm overflow-hidden focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 select-none font-primary`}
+      className={`flex flex-col w-full ${height} rounded-lg bg-white border border-slate-200 shadow-xs overflow-hidden focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 select-none font-primary`}
       style={{ outline: "none" }}
     >
       <style dangerouslySetInnerHTML={{__html: `
@@ -545,7 +545,7 @@ export function DataTable({
       `}} />
 
       {/* Search HUD / Table Header Bar (Fixed height) */}
-      <div className="h-12 flex items-center justify-between px-4 bg-[#E5E5E5] border-b border-zinc-300 gap-4 flex-shrink-0 relative">
+      <div className="h-12 flex items-center justify-between px-4 bg-[#F0F4F9] border-b border-slate-200 gap-4 flex-shrink-0 relative">
         <div className="flex items-center gap-3.5 text-zinc-800">
           <div className="flex items-center gap-2">
             {!globalSearch ? (
@@ -569,7 +569,7 @@ export function DataTable({
         {fetching && (
           <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-200/50 overflow-hidden">
             <div 
-              className="h-full bg-zinc-800 animate-tableProgress origin-left" 
+              className="h-full bg-[#0B57D0] animate-tableProgress origin-left" 
               style={{ width: "40%" }} 
             />
           </div>
@@ -623,12 +623,12 @@ export function DataTable({
       </div>
 
       {/* Table Area (Scrollable body, sticky headers) */}
-      <div className="flex-1 overflow-auto bg-[#EEEEEE] custom-scrollbar">
+      <div className="flex-1 overflow-auto bg-white custom-scrollbar">
         <table className="w-full text-left border-collapse table-auto min-w-max">
           <thead>
-            <tr className="border-b border-zinc-300">
+            <tr className="border-b border-slate-200">
               {isEditMode && (
-                <th className="py-3.5 px-4 sticky top-0 bg-[#E5E5E5] font-semibold text-sm text-zinc-800 border-b border-zinc-300 w-24 select-none z-10 shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)]">
+                <th className="py-3.5 px-4 sticky top-0 bg-[#F0F4F9] font-semibold text-sm text-[#474747] border-b border-slate-200 w-24 select-none z-10">
                   Actions
                 </th>
               )}
@@ -648,8 +648,8 @@ export function DataTable({
                     onDragOver={(e) => handleDragOver(e, colId)}
                     onDrop={(e) => handleDrop(e, colId)}
                     onDragEnd={handleDragEnd}
-                    className={`relative py-3.5 px-4 sticky top-0 bg-[#E5E5E5] font-semibold text-sm text-zinc-800 cursor-grab active:cursor-grabbing border-b border-zinc-300 select-none shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition-all z-10 
-                      ${isDragOver ? "border-r-2 border-zinc-950 bg-zinc-300" : ""} 
+                    className={`relative py-3.5 px-4 sticky top-0 bg-[#F0F4F9] font-semibold text-sm text-[#474747] cursor-grab active:cursor-grabbing border-b border-slate-200 select-none transition-all z-10 
+                      ${isDragOver ? "border-r-2 border-[#0B57D0] bg-[#D3E3FD]" : ""} 
                       ${draggingColId === colId ? "opacity-40" : ""}`}
                   >
                     <div className="flex items-center justify-between gap-1">
@@ -678,8 +678,8 @@ export function DataTable({
                             e.stopPropagation();
                             setActiveFilterCol((prev) => (prev === colId ? null : colId));
                           }}
-                          className={`p-1 rounded hover:bg-[#EEEEEE] transition-colors focus:outline-none cursor-pointer
-                            ${isFiltered ? "text-zinc-950 bg-[#EEEEEE] border border-zinc-300" : "text-zinc-400 hover:text-zinc-800"}`}
+                          className={`p-1 rounded hover:bg-[#E0E8F6] transition-colors focus:outline-none cursor-pointer
+                            ${isFiltered ? "text-[#0B57D0] bg-[#D3E3FD] border border-blue-200" : "text-zinc-400 hover:text-[#1F1F1F]"}`}
                           title="Filter Column"
                         >
                           <Filter size={13} />
@@ -688,7 +688,7 @@ export function DataTable({
                         {/* Dropdown Popover */}
                         {activeFilterCol === colId && (
                           <div 
-                            className="absolute right-0 mt-2 w-48 bg-[#EEEEEE] border border-zinc-300 rounded-lg p-3 shadow-lg z-25 text-left font-normal"
+                            className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-lg p-3 shadow-lg z-25 text-left font-normal"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <div className="flex items-center justify-between mb-2">
@@ -708,12 +708,12 @@ export function DataTable({
                               value={colFilters[colId] || ""}
                               onChange={(e) => handleColumnFilterChange(colId, e.target.value)}
                               placeholder={`Search ${col.header}...`}
-                              className="w-full text-xs bg-[#EEEEEE] border border-zinc-300 rounded px-2 py-1.5 text-zinc-900 focus:outline-none focus:border-zinc-400"
+                              className="w-full text-xs bg-[#F0F4F9] border border-slate-200 rounded px-2 py-1.5 text-zinc-900 focus:outline-none focus:border-blue-400"
                             />
                             <div className="flex justify-end gap-1.5 mt-3">
                               <button 
                                 onClick={() => setActiveFilterCol(null)}
-                                className="text-[10px] font-semibold bg-[#E5E5E5] px-2 py-1 rounded border border-zinc-300 text-zinc-700 hover:text-zinc-950 cursor-pointer"
+                                className="text-[10px] font-semibold bg-white px-2 py-1 rounded border border-slate-200 text-zinc-700 hover:text-zinc-950 cursor-pointer"
                               >
                                 Close
                               </button>
@@ -735,7 +735,7 @@ export function DataTable({
                 return (
                   <tr 
                     key={getRowId(row) || rowIdx}
-                    className={`transition-colors ${isRowEditing ? "bg-[#E5E5E5]/40 font-medium" : "hover:bg-[#E5E5E5]/30"}`}
+                    className={`transition-colors ${isRowEditing ? "bg-[#D3E3FD]/40 font-medium" : "hover:bg-[#F0F4F9]/70"}`}
                   >
                     {isEditMode && (
                       <td className="py-2 px-4 text-sm text-zinc-800 border-r border-zinc-200/50">
@@ -861,7 +861,7 @@ export function DataTable({
       </div>
 
       {/* Fixed Sticky Footer */}
-      <div className="flex items-center justify-between bg-[#E5E5E5] px-5 py-3.5 border-t border-zinc-300 select-none z-10 flex-shrink-0">
+      <div className="flex items-center justify-between bg-[#F0F4F9] px-5 py-3.5 border-t border-slate-200 select-none z-10 flex-shrink-0">
         <span className="font-primary text-sm font-bold text-zinc-700 tracking-tight">
           Total {filteredData.length} records
         </span>

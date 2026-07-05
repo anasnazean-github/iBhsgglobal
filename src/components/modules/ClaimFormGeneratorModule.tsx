@@ -690,7 +690,7 @@ export function ClaimFormGeneratorModule() {
       </div>
 
       {/* Sticky Bottom Footer */}
-      <div className="border-t border-zinc-300/60 pt-4 mt-auto flex flex-col sm:flex-row justify-between items-center bg-[#EEEEEE] gap-4 z-10">
+      <div className="border-t border-slate-200 pt-4 mt-auto flex flex-col sm:flex-row justify-between items-center bg-white gap-4 z-10">
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <CustomButton
             onClick={handleGeneratePDF}
